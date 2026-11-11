@@ -9,6 +9,9 @@
   //   ch.html   template with {{0}}, {{1}}… where the boxes go
   //   ch.cells  [{ ans, stage }] or [{ set: 'name', stage }]
   //   ch.sets   { name: [values] } boxes of a set accept its values in any order
+  //   ch.decimals  adds a decimal-comma key (answers may be decimals)
+  //   ch.validate(values) → bool: for questions with many right answers
+  //              (single stage; cells[i].ans is one valid solution, shown if wrong)
   // Stages are solved one after another (e.g. row by row).
   // ---------------------------------------------------------------
   W.cells = function (ch, el, ctx) {
@@ -18,12 +21,21 @@
     const stageOf = (i) => ch.cells[i].stage || 0;
     const lastStage = Math.max(...ch.cells.map((c) => c.stage || 0));
     const lenOf = (c) => String(c.set ? Math.max(...ch.sets[c.set]) : c.ans).length;
+    const num = (v) => Number(String(v).replace(',', '.'));
+    const disp = (v) => {
+      if (v === '') return '';
+      const [a, b] = String(v).replace('.', ',').split(',');
+      return fmt(Number(a || 0)) + (b !== undefined ? ',' + b : '');
+    };
+    const KEYS = ch.decimals
+      ? ['1', '2', '3', '4', '5', ',', 'del', '6', '7', '8', '9', '0', 'next']
+      : ['1', '2', '3', '4', '5', 'del', '6', '7', '8', '9', '0', 'next'];
     let stage = 0, attempts = 0, mistakes = 0, revealed = false, finished = false, active = -1;
 
     el.innerHTML =
       `<div class="cells-body">${ch.html.replace(/\{\{(\d+)\}\}/g, (m, i) =>
         `<button type="button" class="cell" data-i="${i}" style="--len:${lenOf(ch.cells[i])}"></button>`)}</div>
-      <div class="numpad">${['1', '2', '3', '4', '5', 'del', '6', '7', '8', '9', '0', 'next'].map((k) =>
+      <div class="numpad${ch.decimals ? ' dec' : ''}">${KEYS.map((k) =>
         `<button type="button" class="key${k.length > 1 ? ' fn' : ''}" data-k="${k}">${k === 'del' ? '⌫' : k === 'next' ? '➜' : k}</button>`).join('')}</div>`;
     const cellEls = [];
     el.querySelectorAll('.cell').forEach((b) => (cellEls[+b.dataset.i] = b));
@@ -34,7 +46,7 @@
 
     function paint() {
       cellEls.forEach((b, i) => {
-        b.textContent = vals[i] === '' ? '' : fmt(Number(vals[i]));
+        b.textContent = disp(vals[i]);
         b.className = 'cell ' + status[i] + (i === active ? ' active' : '') + (stageOf(i) > stage ? ' future' : '');
         b.disabled = finished || isLocked(i) || stageOf(i) !== stage;
       });
@@ -56,8 +68,11 @@
       if (k === 'next') return move();
       if (active < 0) return;
       if (k === 'del') vals[active] = vals[active].slice(0, -1);
-      else if (vals[active] === '0') vals[active] = k;
-      else if (vals[active].length < 7) vals[active] += k;
+      else if (k === ',') {
+        if (!ch.decimals || vals[active].includes(',')) return;
+        vals[active] = (vals[active] || '0') + ',';
+      } else if (vals[active] === '0') vals[active] = k;
+      else if (vals[active].length < 10) vals[active] += k;
       if (status[active] === 'wrong') status[active] = '';
       sfx.tap();
       paint();
@@ -86,14 +101,18 @@
         });
       });
       const wrong = [];
-      open().forEach((i) => {
-        const c = ch.cells[i], v = Number(vals[i]);
+      if (ch.validate) {
+        // many right answers: all boxes are right or all are wrong
+        if (ch.validate(vals.map(num))) open().forEach((i) => (status[i] = 'ok'));
+        else wrong.push(...open());
+      } else open().forEach((i) => {
+        const c = ch.cells[i], v = num(vals[i]);
         let ok;
         if (c.set) {
           const p = remaining[c.set].indexOf(v);
           ok = p >= 0;
           if (ok) remaining[c.set].splice(p, 1);
-        } else ok = v === c.ans;
+        } else ok = Math.abs(v - c.ans) < 1e-9;
         if (ok) status[i] = 'ok';
         else wrong.push(i);
       });
@@ -131,6 +150,7 @@
       check,
       key(e) {
         if (/^\d$/.test(e.key)) press(e.key);
+        else if (e.key === ',' || e.key === '.') press(',');
         else if (e.key === 'Backspace') press('del');
         else if (e.key === 'Tab' || e.key === 'ArrowRight' || (e.key === 'Enter' && !isReady())) press('next');
         else return false;
@@ -142,7 +162,8 @@
   // ---------------------------------------------------------------
   // choice: tap one option. ch.options [{ label, correct }]
   //   ch.scene   optional picture shown above the options
-  //   ch.layout  'line' draws the 0–10 000 number line with zones A–J
+  //   ch.layout  'line' a number line split in zones (the options);
+  //                     ch.ticks are its labels (default 0, 1000 … 10 000)
   //              'big'  large picture tiles (for little ones)
   // With more than 2 options a wrong tap can be retried (not in exams).
   // ---------------------------------------------------------------
@@ -151,8 +172,9 @@
     const retry = ctx.maxAttempts > 1 && ch.options.length > 2;
     const scene = ch.scene ? `<div class="scene">${ch.scene}</div>` : '';
     if (ch.layout === 'line') {
+      const ticks = ch.ticks || Array.from({ length: ch.options.length + 1 }, (x, i) => fmt(i * 1000));
       el.innerHTML = scene + `<div class="zline">
-        <div class="zticks">${Array.from({ length: 11 }, (x, i) => `<span style="left:${i * 10}%">${fmt(i * 1000)}</span>`).join('')}</div>
+        <div class="zticks">${ticks.map((t, i) => `<span style="left:${(i * 100) / (ticks.length - 1)}%">${t}</span>`).join('')}</div>
         <div class="zbar">${ch.options.map((o, i) => `<button type="button" class="choice zone" data-i="${i}">${o.label}</button>`).join('')}</div>
       </div>`;
     } else {
@@ -182,13 +204,15 @@
 
   // ---------------------------------------------------------------
   // paint: tap the right numbers on a board.
-  //   ch.board { to, width }   ch.targets [numbers]
+  //   ch.board { to, width } (numbers 1…to) or { values: [..], width }
+  //   ch.targets [numbers]
   // ---------------------------------------------------------------
   W.paint = function (ch, el, ctx) {
     const targets = new Set(ch.targets), picked = new Set();
+    const values = ch.board.values || Array.from({ length: ch.board.to }, (x, i) => i + 1);
     let attempts = 0, mistakes = 0, over = false;
-    let html = `<div class="board" style="grid-template-columns:repeat(${ch.board.width},1fr);max-width:${ch.board.width * 46}px">`;
-    for (let v = 1; v <= ch.board.to; v++) html += `<button type="button" class="sq" data-v="${v}">${v}</button>`;
+    let html = `<div class="board" style="grid-template-columns:repeat(${ch.board.width},minmax(0,1fr));max-width:${ch.board.width * 46}px">`;
+    values.forEach((v) => (html += `<button type="button" class="sq" data-v="${v}">${v}</button>`));
     el.innerHTML = html + '</div>';
     const sq = (v) => el.querySelector(`.sq[data-v="${v}"]`);
 

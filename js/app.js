@@ -12,7 +12,12 @@
   ];
   const RANKS = [[0, 'Cadete'], [10, 'Piloto'], [25, 'Capitán'], [40, 'Comandante'], [55, 'Leyenda galáctica']];
   const DEFAULT_EXAM = { title: 'Agujero Negro: el Examen', label: 'Simulacro', emoji: '🕳️', rounds: 10 };
-  const examOf = (sub) => Object.assign({}, DEFAULT_EXAM, sub.exam);
+  // A subject may split its units in sections (u.section), each with its own exam.
+  // Without sections it is one section whose exam result is saved under the subject id.
+  const sectionsOf = (sub) => sub.sections || [{ id: null, key: sub.id }];
+  const unitsOf = (sub, sec) => (sec.id ? sub.units.filter((u) => u.section === sec.id) : sub.units);
+  const examOf = (sub, sec) => Object.assign({}, DEFAULT_EXAM, sub.exam, sec && sec.exam);
+  const unitLabel = (sub, u) => (sub.young || !u.n ? u.title : `Unidad ${u.n} · ${u.title}`);
   const examStars = (nota) => (nota >= 9 ? 3 : nota >= 6 ? 2 : 1);
 
   const starKey = (sub, u, m) => `${sub.id}.${u.id}.${m.id}`;
@@ -21,10 +26,11 @@
   const starIcons = (n) => `<span class="st">${'★'.repeat(n)}<i>${'★'.repeat(3 - n)}</i></span>`;
   const forAge = (s, p) => !s.ages || (p.age >= s.ages[0] && p.age <= s.ages[1]);
 
-  let keyHandler = null;
+  let keyHandler = null, tick = null;
   document.addEventListener('keydown', (e) => { if (keyHandler) keyHandler(e); });
   function render(html) {
     keyHandler = null;
+    clearInterval(tick);
     if (window.speechSynthesis) speechSynthesis.cancel();
     $app.innerHTML = html;
     window.scrollTo(0, 0);
@@ -176,27 +182,32 @@
 
   // ---------------- planet map ----------------
   function map(sub) {
-    const best = me.exams[sub.id], ex = examOf(sub);
-    const bestText = best === undefined ? (sub.young ? 'Preguntas de todos los planetas' : 'Sin pistas. ¿Te atreves?')
-      : sub.young ? `Tu mejor resultado: ${'★'.repeat(examStars(best))}` : `Tu mejor nota: ${best} / 10`;
+    const planet = (u) => {
+      const got = u.missions.reduce((a, m) => a + (me.stars[starKey(sub, u, m)] || 0), 0), max = u.missions.length * 3;
+      return `<button class="planet${got === max ? ' full' : ''}" data-u="${u.id}" style="--c:${u.color}">
+        <span class="ball">${u.emoji}</span>
+        <span class="ptext"><small>${unitLabel(sub, u)}</small><b>${u.planet}</b><span class="pst">⭐ ${got} / ${max}</span></span>
+      </button>`;
+    };
+    const boss = (sec) => {
+      if (sec.exam === false) return '';
+      const best = me.exams[sec.key], ex = examOf(sub, sec);
+      const bestText = best === undefined ? (sub.young ? 'Preguntas de todos los planetas' : 'Sin pistas. ¿Te atreves?')
+        : sub.young ? `Tu mejor resultado: ${'★'.repeat(examStars(best))}` : `Tu mejor nota: ${best} / 10`;
+      return `<button class="planet boss" data-exam="${sec.key}" style="--c:#3a2a6b">
+        <span class="ball">${ex.emoji}</span>
+        <span class="ptext"><small>${ex.label} · ${ex.rounds} preguntas</small><b>${ex.title}</b><span class="pst">${bestText}</span></span>
+      </button>`;
+    };
     render(`${hud()}<section class="map">
       <h1>${sub.emoji} ${sub.title}</h1>
-      <div class="path">${sub.units.map((u) => {
-        const got = u.missions.reduce((a, m) => a + (me.stars[starKey(sub, u, m)] || 0), 0), max = u.missions.length * 3;
-        return `<button class="planet${got === max ? ' full' : ''}" data-u="${u.id}" style="--c:${u.color}">
-          <span class="ball">${u.emoji}</span>
-          <span class="ptext"><small>${sub.young ? u.title : `Unidad ${u.n} · ${u.title}`}</small><b>${u.planet}</b><span class="pst">⭐ ${got} / ${max}</span></span>
-        </button>`;
-      }).join('')}
-        <button class="planet boss" data-exam style="--c:#3a2a6b">
-          <span class="ball">${ex.emoji}</span>
-          <span class="ptext"><small>${ex.label} · ${ex.rounds} preguntas</small><b>${ex.title}</b><span class="pst">${bestText}</span></span>
-        </button>
-      </div>
+      ${sectionsOf(sub).map((sec) => `
+        ${sec.title ? `<div class="sechead"><h2>${sec.emoji || ''} ${sec.title}</h2>${sec.subtitle ? `<small>${sec.subtitle}</small>` : ''}</div>` : ''}
+        <div class="path">${unitsOf(sub, sec).map(planet).join('')}${boss(sec)}</div>`).join('')}
     </section>`);
     bindHud(() => map(sub));
     on('.planet[data-u]', (b) => sheet(sub, sub.units.find((u) => u.id === b.dataset.u)));
-    on('.planet[data-exam]', () => startExam(sub));
+    on('.planet[data-exam]', (b) => startExam(sub, sectionsOf(sub).find((s) => s.key === b.dataset.exam)));
   }
 
   function sheet(sub, u) {
@@ -204,9 +215,12 @@
     wrap.className = 'overlay';
     wrap.innerHTML = `<div class="sheet" style="--c:${u.color}">
       <button class="icon close" aria-label="Cerrar">✕</button>
-      <div class="shead"><span class="ball">${u.emoji}</span><div><small>${sub.young ? u.title : `Unidad ${u.n} · ${u.title}`}</small><h2>${u.planet}</h2></div></div>
-      ${u.missions.map((m) => `<button class="mission" data-m="${m.id}">
-        <span><b>${m.title}</b><small>${m.desc}</small></span>${starIcons(me.stars[starKey(sub, u, m)] || 0)}<span class="go">▶</span></button>`).join('')}
+      <div class="shead"><span class="ball">${u.emoji}</span><div><small>${unitLabel(sub, u)}</small><h2>${u.planet}</h2></div></div>
+      ${u.missions.map((m) => {
+        const k = starKey(sub, u, m), rec = m.arcade ? ` · 🏆 Récord: ${(me.records || {})[k] || 0}` : '';
+        return `<button class="mission" data-m="${m.id}">
+          <span><b>${m.arcade ? '⏱️ ' : ''}${m.title}</b><small>${m.desc}${rec}</small></span>${starIcons(me.stars[k] || 0)}<span class="go">▶</span></button>`;
+      }).join('')}
     </div>`;
     $app.appendChild(wrap);
     if (sub.young) speak(u.planet);
@@ -219,30 +233,37 @@
 
   // ---------------- sessions ----------------
   function startMission(sub, u, m) {
+    if (m.arcade) return play({ sub, unit: u, mission: m, exam: false, arcade: m.arcade, queue: [], title: m.title, color: u.color });
     const queue = Array.from({ length: m.rounds }, (x, i) => ({
       unit: u, make: () => m.gen(Math.min(2, Math.floor((i * 3) / m.rounds)), i),
     }));
     play({ sub, unit: u, mission: m, exam: false, queue, title: m.title, color: u.color });
   }
-  function startExam(sub) {
-    const ex = examOf(sub);
-    const all = sub.units.flatMap((u) => u.missions.map((m) => ({ unit: u, make: () => m.gen(1) })));
-    const queue = sub.units.map((u) => R.pick(all.filter((x) => x.unit === u)));
+  function startExam(sub, sec) {
+    sec = sec || sectionsOf(sub)[0];
+    const ex = examOf(sub, sec), units = unitsOf(sub, sec);
+    const all = units.flatMap((u) => u.missions.filter((m) => !m.arcade).map((m) => ({ unit: u, make: () => m.gen(1) })));
+    const queue = R.shuffle(units).map((u) => R.pick(all.filter((x) => x.unit === u))).filter(Boolean).slice(0, ex.rounds);
     while (queue.length < ex.rounds) queue.push(R.pick(all));
-    play({ sub, exam: true, queue: R.shuffle(queue).slice(0, ex.rounds), title: ex.title, color: '#8b6cff' });
+    play({ sub, sec, exam: true, queue: R.shuffle(queue), title: ex.title, color: '#8b6cff' });
   }
 
   const CHEERS = ['¡Genial!', '¡Bravo!', '¡Así se hace!', '¡Perfecto!', '¡Qué máquina!', '¡Brillante!', '¡Muy bien!'];
 
+  // Arcade missions ({ arcade: { seconds, goals: [⭐, ⭐⭐, ⭐⭐⭐] } }) ask questions
+  // non-stop until the time runs out; stars depend on how many were right.
   function play(ses) {
-    const total = ses.queue.length, young = !!ses.sub.young;
+    const arcade = ses.arcade, young = !!ses.sub.young;
+    const total = arcade ? Infinity : ses.queue.length;
     const log = []; // per round: { unit, first, solved }
-    let i = 0, combo = 0, earned = 0, widget = null, ch = null, waitingNext = false;
+    let i = 0, combo = 0, earned = 0, widget = null, ch = null, waitingNext = false, over = false, endAt = 0;
 
-    render(`<section class="play${young ? ' young' : ''}" style="--c:${ses.color}">
+    render(`<section class="play${young ? ' young' : ''}${arcade ? ' arcade' : ''}" style="--c:${ses.color}">
       <header class="topbar">
         <button class="icon quit" aria-label="Salir">✕</button>
-        <div class="dots">${ses.queue.map(() => '<i></i>').join('')}</div>
+        ${arcade
+          ? '<div class="timer"><i></i></div><span class="pill score">✔ <b>0</b></span>'
+          : `<div class="dots">${ses.queue.map(() => '<i></i>').join('')}</div>`}
         ${young ? '<button class="icon again" aria-label="Escuchar otra vez">🔊</button>' : ''}
         <span class="pill gems">💎 <b>0</b></span>
       </header>
@@ -270,18 +291,31 @@
     };
 
     const ctx = {
-      maxAttempts: ses.exam ? 1 : 2,
+      maxAttempts: ses.exam || arcade ? 1 : 2,
       ready: (b) => { q('.check').disabled = !b; },
       say,
       fail(msg) { sfx.bad(); say(msg || 'Casi… ¡inténtalo otra vez!'); },
       done(res) {
-        log.push({ unit: ses.queue[i].unit, first: res.first, solved: res.solved });
+        if (over) return;
+        log.push({ unit: arcade ? ses.unit : ses.queue[i].unit, first: res.first, solved: res.solved });
         combo = res.first ? combo + 1 : 0;
-        const gain = res.first ? 10 + (combo >= 3 ? 5 : 0) : res.solved ? 4 : 0;
+        const gain = arcade ? (res.first ? 3 : 0) : res.first ? 10 + (combo >= 3 ? 5 : 0) : res.solved ? 4 : 0;
         earned += gain;
         me.crystals += gain;
         store.save();
         q('.gems b').textContent = earned;
+        if (arcade) {
+          // no feedback panel: flash, then straight to the next question
+          q('.score b').textContent = log.filter((r) => r.first).length;
+          res.first ? sfx.ok() : sfx.bad();
+          const paper = q('.paper');
+          paper.classList.remove('flash-ok', 'flash-bad');
+          void paper.offsetWidth;
+          paper.classList.add(res.first ? 'flash-ok' : 'flash-bad');
+          if (!res.first && ch.explain) say(ch.explain);
+          setTimeout(() => { if (!over) { i++; round(); } }, res.first ? 350 : 1600);
+          return;
+        }
         dots[i].className = res.first ? 'ok' : res.solved ? 'meh' : 'bad';
         res.solved ? sfx.ok() : sfx.bad();
         if (res.first && (combo >= 3 || young)) fx.confetti(young ? 24 : 14);
@@ -301,10 +335,23 @@
     };
 
     function round() {
-      ch = ses.queue[i].make();
+      ch = arcade ? ses.mission.gen(Math.min(2, Math.floor(i / 8)), i) : ses.queue[i].make();
       waitingNext = false;
-      dots[i].className = 'now';
-      q('.ptitle').textContent = `${ses.title} · ${i + 1} de ${total}`;
+      if (arcade) {
+        q('.ptitle').textContent = `${ses.title} · pregunta ${i + 1}`;
+        if (!endAt) {
+          endAt = Date.now() + arcade.seconds * 1000;
+          tick = setInterval(() => {
+            const left = endAt - Date.now();
+            q('.timer i').style.width = Math.max(0, (left / (arcade.seconds * 1000)) * 100) + '%';
+            q('.timer').classList.toggle('hurry', left < 10000);
+            if (left <= 0) { clearInterval(tick); over = true; finish(); }
+          }, 100);
+        }
+      } else {
+        dots[i].className = 'now';
+        q('.ptitle').textContent = `${ses.title} · ${i + 1} de ${total}`;
+      }
       q('.prompt').innerHTML = ch.prompt;
       q('.feedback').hidden = true;
       q('.bubble').hidden = true;
@@ -327,9 +374,26 @@
     }
     function finish() {
       const first = log.filter((r) => r.first).length;
+      if (arcade) {
+        const k = starKey(ses.sub, ses.unit, ses.mission), goals = arcade.goals;
+        const stars = goals.filter((g) => first >= g).length;
+        me.records = me.records || {};
+        const record = first > (me.records[k] || 0);
+        if (record) me.records[k] = first;
+        if (stars) me.stars[k] = Math.max(me.stars[k] || 0, stars);
+        store.save();
+        return result({
+          ses, earned,
+          head: record && first ? '¡Nuevo récord!' : stars === 3 ? '¡Velocidad de la luz!' : stars ? '¡Bien jugado!' : '¡Sigue entrenando!',
+          big: bigStars(stars),
+          body: `<p><b>${first}</b> aciertos en ${arcade.seconds} segundos · 🏆 Récord: ${me.records[k] || 0}</p>
+            <p>⭐ ${goals[0]} · ⭐⭐ ${goals[1]} · ⭐⭐⭐ ${goals[2]} aciertos</p>`,
+          party: stars >= 2 || (record && first > 0),
+        });
+      }
       if (ses.exam) {
-        const nota = Math.round((first / total) * 10);
-        if (me.exams[ses.sub.id] === undefined || nota > me.exams[ses.sub.id]) me.exams[ses.sub.id] = nota;
+        const nota = Math.round((first / total) * 10), key = ses.sec.key;
+        if (me.exams[key] === undefined || nota > me.exams[key]) me.exams[key] = nota;
         store.save();
         const weak = [...new Set(log.filter((r) => !r.first).map((r) => r.unit))];
         const stars = examStars(nota);
@@ -399,7 +463,7 @@
     if (r.party) { sfx.win(); fx.confetti(60); }
     if (ses.sub.young) speak(r.head);
     on('[data-act="next"]', () => startMission(ses.sub, nextUp.u, nextUp.m));
-    on('[data-act="again"]', () => (ses.exam ? startExam(ses.sub) : startMission(ses.sub, ses.unit, ses.mission)));
+    on('[data-act="again"]', () => (ses.exam ? startExam(ses.sub, ses.sec) : startMission(ses.sub, ses.unit, ses.mission)));
     on('[data-act="map"]', () => map(ses.sub));
     on('.chip[data-u]', (b) => { map(ses.sub); sheet(ses.sub, ses.sub.units.find((u) => u.id === b.dataset.u)); });
   }

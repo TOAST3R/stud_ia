@@ -3,9 +3,10 @@
   const S = (window.StudIA = { subjects: {}, widgets: {} });
 
   // 12345 -> "12 345" (narrow no-break space, like the workbook)
+  // 3.75 -> "3,75" (Spanish decimal comma)
   S.fmt = (n) => {
-    const s = String(Math.abs(n)).replace(/\B(?=(\d{3})+$)/g, ' ');
-    return (n < 0 ? '−' : '') + s;
+    const [int, dec] = String(Math.abs(n)).split('.');
+    return (n < 0 ? '−' : '') + int.replace(/\B(?=(\d{3})+$)/g, ' ') + (dec ? ',' + dec : '');
   };
 
   const int = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
