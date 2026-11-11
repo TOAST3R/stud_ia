@@ -509,7 +509,7 @@
     q('.quit').addEventListener('click', () => { if (confirm('¿Salir de la misión? Perderás el progreso de esta partida.')) map(ses.sub); });
     keyHandler = (e) => {
       if (e.metaKey || e.ctrlKey || e.altKey) return;
-      if (waitingNext) { if (e.key === 'Enter' || e.key === 'ArrowLeft') { e.preventDefault(); next(); } return; }
+      if (waitingNext) { if (e.key === 'Enter' || e.key === 'ArrowRight') { e.preventDefault(); next(); } return; }
       if (widget && widget.key && widget.key(e)) return e.preventDefault();
       if (e.key === 'Enter' && widget && widget.check && !q('.check').disabled) { e.preventDefault(); widget.check(); }
     };
@@ -546,7 +546,7 @@
     const goNext = () => travel(ses.sub, ses.unit, nextUp.u, () => startMission(ses.sub, nextUp.u, nextUp.m));
     on('[data-act="next"]', goNext);
     keyHandler = (e) => {
-      if (nextUp && (e.key === 'ArrowLeft' || e.key === 'Enter')) { e.preventDefault(); goNext(); }
+      if (nextUp && (e.key === 'ArrowRight' || e.key === 'Enter')) { e.preventDefault(); goNext(); }
     };
     on('[data-act="again"]', () => (ses.exam ? startExam(ses.sub, ses.sec) : startMission(ses.sub, ses.unit, ses.mission)));
     on('[data-act="map"]', () => map(ses.sub));

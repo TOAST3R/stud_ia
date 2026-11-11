@@ -157,7 +157,7 @@
     }
     function onKey(e) {
       if ([' ', 'ArrowUp', 'w', 'W'].includes(e.key)) { e.preventDefault(); over ? close() : jump(); }
-      else if ((e.key === 'Enter' || e.key === 'ArrowLeft') && over) { e.preventDefault(); close(); }
+      else if ((e.key === 'Enter' || e.key === 'ArrowRight') && over) { e.preventDefault(); close(); }
     }
     canvas.addEventListener('pointerdown', (e) => { e.preventDefault(); jump(); });
     root.querySelector('.rskip').addEventListener('click', close);
