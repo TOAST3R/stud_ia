@@ -230,6 +230,7 @@
     const stars = totalStars();
     const next = S.CHARS.find((a) => a.need > stars);
     render(`${hud()}<section class="home">
+      <div class="home-brand">${S.brand.logo('hero')}</div>
       <div class="greet">
         <div class="hero-char">${CH(me.avatar, 'happy')}</div>
         <div class="greet-talk"><h1 class="title3d">¡Hola, ${esc(me.name)}!</h1><p>${cursoName(me.curso) ? `Estás en ${cursoName(me.curso)}. ` : ''}¿Qué galaxia exploramos hoy?</p>
@@ -244,7 +245,7 @@
       <div class="avatars crew">${S.CHARS.map((a) => (a.need > stars
         ? `<span class="avatar locked" title="Necesitas ${a.need} estrellas">${CH(a.id, 'idle', 'sil')}<small>🔒 ${a.need} ⭐</small></span>`
         : `<button class="avatar${a.id === me.avatar ? ' sel' : ''}" data-e="${a.id}">${CH(a.id, a.id === me.avatar ? 'happy' : 'idle')}<small>${a.name}</small></button>`)).join('')}</div>
-      <footer class="sig">${S.brand.logo('small')}<span>${S.brand.TAGLINE}</span></footer>
+      <footer class="sig"><span>${S.brand.TAGLINE}</span></footer>
     </section>`);
     bindHud(home);
     on('.subject[data-sub]', (b) => map(S.subjects[b.dataset.sub]));

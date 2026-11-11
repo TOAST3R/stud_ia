@@ -750,3 +750,5 @@ body::before {
 .intro-tag { margin: 0; color: #d9ccff; font-weight: 800; animation: fade .6s 1.2s both; }
 @keyframes land { from { transform: translateY(-60vh) rotate(-140deg) scale(.4); } }
 @keyframes typein { from { visibility: hidden; } }
+.home-brand { display: flex; justify-content: center; margin: 2px 0 10px; }
+.home-brand .brand.hero { font-size: clamp(36px, 9vw, 54px); margin: 0; }
