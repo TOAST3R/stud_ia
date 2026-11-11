@@ -71,13 +71,13 @@
     store.save();
     me = store.player;
     if (!data.players.length) return editPlayer(null);
-    const unfinished = data.players.find((p) => !p.age);
-    if (unfinished) return editPlayer(unfinished);
+    // a player carried over from the first version is asked his age when he
+    // is picked, never before the "¿Quién juega?" screen
     if (data.players.length === 1) {
       me = data.players[0];
       data.current = me.id;
       store.save();
-      return home();
+      return me.age ? home() : editPlayer(me);
     }
     players();
   }
@@ -87,7 +87,7 @@
       <h1 class="title3d">¿Quién juega?</h1>
       <div class="players">
         ${data.players.map((p) => `<div class="pcard" data-tilt>
-          <button class="pplay" data-id="${p.id}"><span class="podium">${CH(p.avatar)}</span><b>${esc(p.name)}</b><small>${p.age ? `${p.age} años · ` : ''}⭐ ${totalStars(p)}</small></button>
+          <button class="pplay" data-id="${p.id}"><span class="podium">${CH(p.avatar)}</span><b>${esc(p.name)}</b><small>${p.age ? `${p.age} años · ` : 'falta tu edad · '}⭐ ${totalStars(p)}</small></button>
           <button class="icon pedit" data-id="${p.id}" aria-label="Editar a ${esc(p.name)}">✏️</button>
         </div>`).join('')}
         <button class="pcard pnew" data-tilt><span class="podium empty">+</span><b>Nuevo jugador</b><small>Para otro hermano</small></button>
@@ -108,16 +108,15 @@
   // Same form for the first player, a new one, or one carried over from the
   // first version (setup: his progress is kept, only name/age/avatar are asked).
   function editPlayer(p) {
-    const isNew = !p, setup = !!p && !p.age, first = !data.players.length || setup;
+    const isNew = !p, setup = !!p && !p.age, first = !data.players.length || (setup && data.players.length === 1);
     let age = p ? p.age : null, avatar = p ? S.charId(p.avatar) : 'astro';
     const unlocked = S.CHARS.filter((a) => a.need <= (p ? totalStars(p) : 0));
     render(`<section class="welcome">
       ${first ? '' : '<button class="icon back" aria-label="Volver">←</button>'}
       <div class="logo">${CH(avatar, 'happy')}</div>
-      <h1>${first ? 'StudIA' : isNew ? 'Nuevo jugador' : 'Editar jugador'}</h1>
-      ${!first ? '' : setup
-        ? '<p class="lead">¡Nueva versión! Ahora pueden jugar varios hermanos. Tu progreso se guarda: solo confirma tus datos.</p>'
-        : '<p class="lead">Una aventura espacial para aprender y preparar exámenes.</p>'}
+      <h1>${setup ? 'Tu edad' : first ? 'StudIA' : isNew ? 'Nuevo jugador' : 'Editar jugador'}</h1>
+      ${setup ? `<p class="lead">¡Hola, ${esc(p.name)}! Tu progreso está guardado (⭐ ${totalStars(p)}). Solo falta que nos digas tu edad.</p>`
+        : first ? '<p class="lead">Una aventura espacial para aprender y preparar exámenes.</p>' : ''}
       <label>¿Cómo te llamas?<input id="name" maxlength="14" autocomplete="off" placeholder="Tu nombre" value="${esc(p ? p.name : '')}"></label>
       <p class="q">¿Cuántos años tienes?</p>
       <div class="ages">${[3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((a) => `<button class="age${a === age ? ' sel' : ''}" data-a="${a}">${a}</button>`).join('')}</div>
