@@ -97,8 +97,8 @@
 
   function hud() {
     return `<header class="hud">
+      <button class="hud-brand" data-nav="home" title="Stud_IA · inicio">${S.brand.mark()}</button>
       <button class="me" data-nav="players" title="Cambiar de jugador"><span class="ava">${CH(me.avatar)}</span><span class="metext"><b>${esc(me.name)}</b><small>${me.curso ? `<em>${cursoName(me.curso)}</em> · ` : ''}${rank()} · cambiar ⇄</small></span></button>
-      <button class="pill" data-nav="home" title="Inicio">🏠</button>
       <button class="pill" data-nav="progress" title="Tu progreso">📊 <span class="hide-s">Progreso</span></button>
       <span class="pill">⭐ ${totalStars()}</span><span class="pill">💎 ${fmt(me.crystals)}</span>
       <button class="icon" data-act="sound" aria-label="Sonido">${data.sound ? '🔊' : '🔇'}</button>
@@ -131,6 +131,7 @@
 
   function players() {
     render(`<section class="picker">
+      ${S.brand.logo('hero')}
       <h1 class="title3d">¿Quién juega?</h1>
       <div class="players">
         ${data.players.map((p) => `<div class="pcard" data-tilt>
@@ -161,9 +162,9 @@
     render(`<section class="welcome">
       ${first ? '' : '<button class="icon back" aria-label="Volver">←</button>'}
       <div class="logo">${CH(avatar, 'happy')}</div>
-      <h1>${setup ? 'Tu curso' : first ? 'StudIA' : isNew ? 'Nuevo jugador' : 'Editar jugador'}</h1>
+      ${first && !setup ? S.brand.logo('hero') : `<h1>${setup ? 'Tu curso' : isNew ? 'Nuevo jugador' : 'Editar jugador'}</h1>`}
       ${setup ? `<p class="lead">¡Hola, ${esc(p.name)}! Tu progreso está guardado (⭐ ${totalStars(p)}). Solo falta que elijas tu curso.</p>`
-        : first ? '<p class="lead">Una aventura espacial para aprender y preparar exámenes.</p>' : ''}
+        : first ? `<p class="lead">${S.brand.TAGLINE}</p>` : ''}
       <label>¿Cómo te llamas?<input id="name" maxlength="14" autocomplete="off" placeholder="Tu nombre" value="${esc(p ? p.name : '')}"></label>
       <p class="q">¿En qué curso estás?</p>
       ${cursoChips(curso)}
@@ -243,6 +244,7 @@
       <div class="avatars crew">${S.CHARS.map((a) => (a.need > stars
         ? `<span class="avatar locked" title="Necesitas ${a.need} estrellas">${CH(a.id, 'idle', 'sil')}<small>🔒 ${a.need} ⭐</small></span>`
         : `<button class="avatar${a.id === me.avatar ? ' sel' : ''}" data-e="${a.id}">${CH(a.id, a.id === me.avatar ? 'happy' : 'idle')}<small>${a.name}</small></button>`)).join('')}</div>
+      <footer class="sig">${S.brand.logo('small')}<span>${S.brand.TAGLINE}</span></footer>
     </section>`);
     bindHud(home);
     on('.subject[data-sub]', (b) => map(S.subjects[b.dataset.sub]));
@@ -724,5 +726,6 @@
   }
 
   fx.starfield();
+  S.brandIntro();
   start();
 })();
