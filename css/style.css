@@ -752,3 +752,14 @@ body::before {
 @keyframes typein { from { visibility: hidden; } }
 .home-brand { display: flex; justify-content: center; margin: 2px 0 10px; }
 .home-brand .brand.hero { font-size: clamp(36px, 9vw, 54px); margin: 0; }
+
+/* ---------- logic: positions grid, robot grid ---------- */
+.posgrid, .robotgrid { display: grid; gap: 6px; padding: 8px; border-radius: 18px; background: #f1e5c7; }
+.posgrid { grid-template-columns: repeat(3, 1fr); font-size: 40px; }
+.posgrid span, .robotgrid span { display: grid; place-items: center; width: 1.5em; height: 1.5em; border-radius: 12px; background: #fff; }
+.posgrid span.ref { background: #ffe9a8; box-shadow: 0 0 0 3px #f0b400; }
+.robotgrid { font-size: 32px; }
+.robotgrid span { border: 2px dashed #e6d7b3; }
+.arrows { font-size: 34px; letter-spacing: 4px; padding: 6px 14px; border-radius: 14px; background: #fff; box-shadow: 0 4px 0 var(--line); }
+.choices.big .choice.ok, .choices.big .choice.wrong { font-size: 46px; }
+@media (max-width: 430px) { .hud .hstars { display: none; } }

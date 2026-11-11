@@ -319,7 +319,8 @@
   };
 
   // ---------------------------------------------------------------
-  // pick: tap exactly ch.count of the ch.items.
+  // pick: tap exactly ch.count of the ch.items, or, with ch.targets [indexes],
+  // exactly those items (sorting: "toca todos los que vuelan").
   // ---------------------------------------------------------------
   W.pick = function (ch, el, ctx) {
     const picked = new Set();
@@ -338,7 +339,9 @@
     });
     function check() {
       if (over || !picked.size) return;
-      if (picked.size === ch.count) {
+      const targets = ch.targets && new Set(ch.targets);
+      const right = targets ? picked.size === targets.size && [...picked].every((i) => targets.has(i)) : picked.size === ch.count;
+      if (right) {
         over = true;
         pks.forEach((b) => (b.disabled = true));
         picked.forEach((i) => pks[i].classList.add('ok'));
@@ -351,9 +354,13 @@
         pks.forEach((b, i) => {
           b.disabled = true;
           b.classList.remove('on');
-          if (i < ch.count) b.classList.add('shown');
+          if (targets ? targets.has(i) : i < ch.count) b.classList.add('shown');
         });
         return ctx.done({ first: false, solved: false });
+      }
+      if (targets) {
+        const missing = [...targets].filter((i) => !picked.has(i)).length, extra = [...picked].filter((i) => !targets.has(i)).length;
+        return ctx.fail(missing && extra ? 'Hay alguno que no es y te falta alguno. ¡Mira otra vez!' : missing ? '¡Te falta alguno! Mira bien.' : 'Has tocado alguno que no es. ¡Quítalo!');
       }
       ctx.fail(picked.size < ch.count ? `Has tocado ${picked.size}. ¡Faltan más!` : `Has tocado ${picked.size}. ¡Te has pasado!`);
     }

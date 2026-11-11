@@ -242,6 +242,153 @@
     };
   }
 
+
+  // ---------- more logic games ----------
+  // growing series: one more each time (lvl 2: two more)
+  function gGrowing(lvl) {
+    const e = R.pick(['⭐', '🍎', '🐞', '🔵', '🌸']), step = lvl === 2 ? 2 : 1, start = R.int(1, lvl ? 2 : 1);
+    const counts = [0, 1, 2].map((k) => start + k * step), ans = start + 3 * step;
+    const grp = (n) => `<span class="grp" style="font-size:22px">${e.repeat(n)}</span>`;
+    const opts = [...new Set([ans, ans - step, ans + step, ans + 1].filter((x) => x > 0))].slice(0, 3);
+    return {
+      type: 'choice', layout: 'big', prompt: 'Cada vez hay más. ¿Qué va después?',
+      scene: `<div class="series">${counts.map(grp).join('<b class="op">→</b>')}<b class="op">→</b><span class="it q">?</span></div>`,
+      options: R.shuffle(opts).map((n) => ({ label: grp(n), correct: n === ans })),
+      explain: `Cada vez hay ${step} más: ${counts.join(', ')} y <b>${ans}</b>.`,
+    };
+  }
+  // sorting: tap all the things that are…
+  const SORTS = [
+    ['que vuelan', ['🐦', '🦋', '✈️', '🐝', '🦅', '🚁', '🦆', '🎈'], ['🐶', '🚗', '🐟', '🐢', '🍎', '🐘', '🐌', '🚂']],
+    ['que viven en el agua', ['🐟', '🐙', '🐳', '🦀', '🐬', '🦈', '🐠'], ['🐶', '🐱', '🐦', '🐘', '🦒', '🐴', '🐰']],
+    ['que se comen', ['🍎', '🍌', '🥕', '🍞', '🧀', '🍓', '🍪', '🍉'], ['🧸', '⚽', '👟', '📚', '🔑', '🚗', '🧦', '✏️']],
+    ['que tienen ruedas', ['🚗', '🚲', '🚌', '🛴', '🚜', '🚒', '🛹'], ['⛵', '✈️', '🐴', '🚀', '🏠', '🌳', '🐢']],
+    ['que se ponen en el cuerpo', ['👕', '👖', '🧢', '🧦', '👟', '🧤', '🧣'], ['🍎', '🚗', '📚', '⚽', '🌸', '🔑', '🐶']],
+    ['que dan luz', ['☀️', '💡', '🕯️', '🔦', '⭐', '🌙'], ['🧸', '🍎', '🐟', '📚', '🧦', '🌳']],
+  ];
+  function gSort(lvl) {
+    const [name, yes, no] = R.pick(SORTS), k = [2, 3, 4][lvl], total = [6, 8, 10][lvl];
+    const items = R.shuffle([...R.sample(yes, k).map((e) => [e, true]), ...R.sample(no, total - k).map((e) => [e, false])]);
+    return {
+      type: 'pick', prompt: `Toca todos los ${name}.`, items: items.map((x) => x[0]), targets: items.map((x, i) => (x[1] ? i : -1)).filter((i) => i >= 0),
+      explain: `Los ${name} son: ${items.filter((x) => x[1]).map((x) => x[0]).join(' ')}`,
+    };
+  }
+  // find the different one among very similar pictures
+  const LOOKALIKES = [['🐟', '🐠'], ['🍎', '🍏'], ['🚗', '🚙'], ['🐶', '🐕'], ['😀', '😃'], ['🌕', '🌝'], ['🐱', '🐈'], ['🌷', '🌹'], ['🔵', '🟣'], ['⭐', '🌟'], ['🐭', '🐹'], ['🐻', '🐼']];
+  function gDifferent(lvl) {
+    const [same, diff] = R.shuffle(R.pick(LOOKALIKES)), n = [4, 6, 9][lvl], at = R.int(0, n - 1);
+    return {
+      type: 'choice', layout: 'big', repeats: true, prompt: '¿Cuál es diferente? ¡Mira bien!',
+      options: Array.from({ length: n }, (x, i) => ({ label: i === at ? diff : same, correct: i === at })),
+      explain: `Todos son ${same} menos uno: <b>${diff}</b>.`, sayAfter: '',
+    };
+  }
+  // opposites and things that go together
+  const OPPOSITES = [['☀️', '🌙', 'el día', 'la noche'], ['🔥', '🧊', 'caliente', 'frío'], ['😀', '😢', 'contento', 'triste'], ['🐘', '🐭', 'grande', 'pequeño'], ['⬆️', '⬇️', 'arriba', 'abajo'], ['🐇', '🐢', 'rápido', 'lento'], ['💡', '🌑', 'luz', 'oscuridad'], ['🌞', '❄️', 'verano', 'invierno']];
+  function gOpposite(lvl) {
+    const [a, b, wa, wb] = R.pick(OPPOSITES), flip = R.int(0, 1) === 1, [q, ans, wq, wans] = flip ? [b, a, wb, wa] : [a, b, wa, wb];
+    const wrong = R.sample(OPPOSITES.flatMap((o) => [o[0], o[1]]).filter((x) => x !== q && x !== ans), lvl ? 3 : 2);
+    return {
+      type: 'choice', layout: 'big', prompt: '¿Qué es lo contrario?', scene: `<span class="hero">${q}</span>`,
+      options: R.shuffle([ans, ...wrong]).map((e) => ({ label: e, correct: e === ans })),
+      explain: `Lo contrario de <b>${wq}</b> es <b>${wans}</b>.`,
+    };
+  }
+  const GOES_WITH = [['🔒', '🔑'], ['🧦', '👟'], ['🐝', '🍯'], ['🐶', '🦴'], ['🐰', '🥕'], ['☔', '🌧️'], ['🪥', '🦷'], ['✏️', '📒'], ['⚽', '🥅'], ['🍳', '🥚'], ['🐵', '🍌'], ['🧤', '✋'], ['🐟', '🎣'], ['🎂', '🕯️'], ['🚗', '⛽']];
+  function gGoesWith(lvl) {
+    const [a, b] = R.shuffle(R.pick(GOES_WITH)), pair = GOES_WITH.find((p) => p.includes(a));
+    const wrong = R.sample(GOES_WITH.filter((p) => p !== pair).map((p) => R.pick(p)), lvl ? 3 : 2);
+    return {
+      type: 'choice', layout: 'big', prompt: '¿Qué va con esto?', scene: `<span class="hero">${a}</span>`,
+      options: R.shuffle([b, ...wrong]).map((e) => ({ label: e, correct: e === b })),
+      explain: `${a} va con <b>${b}</b>.`, sayAfter: '',
+    };
+  }
+  function gMemGoes(lvl) {
+    const k = [3, 4, 5][lvl];
+    return { type: 'memory', prompt: 'Busca las parejas que van juntas.', pairs: R.sample(GOES_WITH, k), explain: '¡Todas las parejas encontradas!' };
+  }
+  // what happens first (time order)
+  const STORIES = [
+    ['🥚', '🐣', '🐥', '🐔'], ['🌱', '🌿', '🌳'], ['🐛', '🛌', '🦋'], ['🥣', '🥞', '😋'], ['🌑', '🌓', '🌕'], ['👶', '🧒', '🧑', '👴'],
+    ['🌰', '🌱', '🌻'], ['🍞', '🥪', '😋'], ['☁️', '🌧️', '🌈'], ['🧊', '💧', '♨️'],
+  ];
+  function gStory(lvl) {
+    const st = R.pick(STORIES.filter((x) => (lvl === 2 ? true : x.length <= (lvl ? 4 : 3)))), items = st.map((e, i) => ({ label: e, rank: i }));
+    let mixed;
+    do { mixed = R.shuffle(items); } while (mixed.every((x, i) => x.rank === i));
+    return {
+      type: 'order', prompt: '¿Qué pasa primero? Ordena la historia.', items: mixed, ends: ['primero', 'después'],
+      explain: `${st.join(' → ')}`,
+    };
+  }
+  // positions in a grid: arriba, abajo, izquierda, derecha
+  const POS_THINGS = ['🐶', '🐱', '🐸', '🦊', '🐵', '🐰', '🐻', '🐼', '🦁', '🐷', '🐮', '🐔'];
+  function gPosition(lvl) {
+    const n = 3, things = R.sample(POS_THINGS, n * n), grid = [];
+    for (let r = 0; r < n; r++) grid.push(things.slice(r * n, r * n + n));
+    const dirs = lvl === 0 ? [['arriba', -1, 0], ['abajo', 1, 0]] : [['arriba', -1, 0], ['abajo', 1, 0], ['a la izquierda', 0, -1], ['a la derecha', 0, 1]];
+    let r, c, d;
+    do { r = R.int(0, n - 1); c = R.int(0, n - 1); d = R.pick(dirs); } while (r + d[1] < 0 || r + d[1] >= n || c + d[2] < 0 || c + d[2] >= n);
+    const ref = grid[r][c], ans = grid[r + d[1]][c + d[2]];
+    const wrong = R.sample(things.filter((x) => x !== ans && x !== ref), 2);
+    return {
+      type: 'choice', layout: 'big', prompt: `¿Quién está justo ${d[0]} del ${ref}?`,
+      scene: `<div class="posgrid">${things.map((t) => `<span class="${t === ref ? 'ref' : ''}">${t}</span>`).join('')}</div>`,
+      options: R.shuffle([ans, ...wrong]).map((e) => ({ label: e, correct: e === ans })),
+      explain: `Justo ${d[0]} del ${ref} está <b>${ans}</b>.`, sayAfter: '',
+    };
+  }
+  // riddles, read aloud
+  const RIDDLES = [
+    ['Tengo cuatro patas, mueve la cola y digo guau.', '🐶'], ['Soy amarillo, alargado y me pelan para comerme.', '🍌'], ['Salgo por la noche y brillo en el cielo, pero no soy una estrella.', '🌙'],
+    ['Tengo ruedas y me llevan al cole muchos niños.', '🚌'], ['Vivo en el agua, tengo aletas y no tengo patas.', '🐟'], ['Tengo una trompa muy larga y orejas grandes.', '🐘'],
+    ['Me pones en los pies antes de salir a la calle.', '👟'], ['Hago miel y zumbo: bzzz.', '🐝'], ['Doy calor y luz durante el día.', '☀️'],
+    ['Soy roja por fuera, tengo semillas y a veces voy en la tarta.', '🍓'], ['Tengo teclas blancas y negras y hago música.', '🎹'], ['Me abres cuando llueve para no mojarte.', '☂️'],
+    ['Soy de hielo y tengo nariz de zanahoria.', '⛄'], ['Llevo una casa a cuestas y voy muy despacio.', '🐌'], ['Vuelo muy alto y llevo a la gente de viaje.', '✈️'],
+  ];
+  function gRiddle(lvl) {
+    const [text, ans] = R.pick(RIDDLES), wrong = R.sample(RIDDLES.map((x) => x[1]).filter((x) => x !== ans), lvl ? 3 : 2);
+    return {
+      type: 'choice', layout: 'big', prompt: `Adivina, adivinanza: ${text} ¿Quién soy?`,
+      options: R.shuffle([ans, ...wrong]).map((e) => ({ label: e, correct: e === ans })),
+      explain: `¡Es ${ans}!`, sayAfter: '',
+    };
+  }
+  // the robot follows the arrows: where does it end?
+  const ARROWS = { '⬆️': [-1, 0], '⬇️': [1, 0], '⬅️': [0, -1], '➡️': [0, 1] };
+  function gRobot(lvl) {
+    const n = lvl === 0 ? 3 : 4, steps = [2, 3, 5][lvl];
+    let path, r0, c0, end;
+    for (;;) {
+      r0 = R.int(0, n - 1); c0 = R.int(0, n - 1); path = [];
+      let r = r0, c = c0, ok = true;
+      const seen = new Set([`${r},${c}`]);
+      for (let k = 0; k < steps; k++) {
+        const opts = Object.entries(ARROWS).filter(([, [dr, dc]]) => r + dr >= 0 && r + dr < n && c + dc >= 0 && c + dc < n && !seen.has(`${r + dr},${c + dc}`));
+        if (!opts.length) { ok = false; break; }
+        const [a, [dr, dc]] = R.pick(opts);
+        path.push(a); r += dr; c += dc; seen.add(`${r},${c}`);
+      }
+      if (ok) { end = [r, c]; break; }
+    }
+    const prizes = R.sample(['🍎', '⭐', '🎈', '🍪', '💎', '🎁', '⚽', '🍦'], 4), cells = {};
+    cells[end.join(',')] = prizes[0];
+    const free = [];
+    for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) if (!(r === r0 && c === c0) && `${r},${c}` !== end.join(',')) free.push(`${r},${c}`);
+    R.sample(free, 3).forEach((k, i) => (cells[k] = prizes[i + 1]));
+    let g = '';
+    for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) g += `<span>${r === r0 && c === c0 ? '🤖' : cells[`${r},${c}`] || ''}</span>`;
+    return {
+      type: 'choice', layout: 'big', prompt: 'El robot sigue las flechas, una casilla cada vez. ¿Dónde llega?',
+      scene: `<div class="robotgrid" style="grid-template-columns:repeat(${n},1fr)">${g}</div><div class="arrows">${path.join(' ')}</div>`,
+      options: R.shuffle(prizes).map((e) => ({ label: e, correct: e === prizes[0] })),
+      hint: 'Pon el dedo en el robot y muévelo una casilla por cada flecha.',
+      explain: `Siguiendo ${path.join(' ')} el robot llega a <b>${prizes[0]}</b>.`, sayAfter: '',
+    };
+  }
+
   const reto = { title: 'El Gran Reto', label: 'Un poco de todo', emoji: '🏆', rounds: 8 };
 
   S.subjects.numeros = {
@@ -277,25 +424,47 @@
   };
 
   S.subjects.logica = {
-    id: 'logica', title: 'Lógica', emoji: '🧩', tagline: 'Series, sombras, sudokus y parejas',
-    ages: [3, 7], young: true, exam: reto,
+    id: 'logica', title: 'Lógica', emoji: '🧩', tagline: 'Series, clasificar, robots, adivinanzas y sudokus',
+    ages: [3, 7], young: true, exam: Object.assign({}, reto, { rounds: 10 }),
     units: [
       { id: 'series', n: 1, title: 'Series', planet: 'Planeta Series', emoji: '🔁', color: '#ff6fb1', missions: [
         { id: 'sigue', title: 'Sigue la serie', desc: '¿Qué va después?', rounds: 6, gen: gSeries },
+        { id: 'crece', title: 'Series que crecen', desc: 'Cada vez hay más', rounds: 5, gen: gGrowing },
       ] },
       { id: 'familias', n: 2, title: 'Familias', planet: 'Bosque de las Familias', emoji: '🌳', color: '#2fd9a4', missions: [
         { id: 'intruso', title: '¿Cuál no es de la familia?', desc: 'Busca al intruso', rounds: 6, gen: gOdd },
+        { id: 'clasifica', title: 'Clasifica', desc: 'Toca todos los que…', rounds: 5, gen: gSort },
       ] },
       { id: 'sombras', n: 3, title: 'Sombras', planet: 'Cueva de las Sombras', emoji: '🔦', color: '#8b6cff', missions: [
         { id: 'sombra', title: 'Busca la sombra', desc: '¿De quién es esta sombra?', rounds: 5, gen: gShadow },
       ] },
-      { id: 'tamanos', n: 4, title: 'Tamaños', planet: 'Valle de los Tamaños', emoji: '📏', color: '#ffd23f', missions: [
+      { id: 'ojo', n: 4, title: 'Ojo de lince', planet: 'Planeta Lupa', emoji: '🔍', color: '#4fd1c5', missions: [
+        { id: 'diferente', title: '¿Cuál es diferente?', desc: 'Mira con mucha atención', rounds: 6, gen: gDifferent },
+      ] },
+      { id: 'tamanos', n: 5, title: 'Tamaños', planet: 'Valle de los Tamaños', emoji: '📏', color: '#ffd23f', missions: [
         { id: 'ordena', title: 'Ordena por tamaño', desc: 'Del pequeño al grande… ¡y al revés!', rounds: 4, gen: gSizes },
       ] },
-      { id: 'memoria', n: 5, title: 'Memoria', planet: 'Planeta Memoria', emoji: '🧠', color: '#58c4ff', missions: [
-        { id: 'parejas', title: 'Parejas', desc: 'Encuentra las cartas iguales', rounds: 3, gen: gPairs },
+      { id: 'contrarios', n: 6, title: 'Contrarios y parejas', planet: 'Planeta Espejo', emoji: '🪞', color: '#ff9d3d', missions: [
+        { id: 'contrario', title: 'Lo contrario', desc: 'Día y noche, frío y caliente…', rounds: 5, gen: gOpposite },
+        { id: 'vaconque', title: '¿Qué va con esto?', desc: 'La llave y el candado…', rounds: 5, gen: gGoesWith },
       ] },
-      { id: 'sudoku', n: 6, title: 'Sudoku', planet: 'Isla Sudoku', emoji: '🏝️', color: '#ff9d3d', missions: [
+      { id: 'historias', n: 7, title: 'Historias', planet: 'Planeta Cuento', emoji: '📖', color: '#ff7a59', missions: [
+        { id: 'primero', title: '¿Qué pasa primero?', desc: 'Ordena la historia', rounds: 5, gen: gStory },
+      ] },
+      { id: 'posiciones', n: 8, title: 'Posiciones', planet: 'Planeta Brújula', emoji: '🧭', color: '#7d8cff', missions: [
+        { id: 'donde', title: '¿Quién está al lado?', desc: 'Arriba, abajo, izquierda, derecha', rounds: 6, gen: gPosition },
+      ] },
+      { id: 'memoria', n: 9, title: 'Memoria', planet: 'Planeta Memoria', emoji: '🧠', color: '#58c4ff', missions: [
+        { id: 'parejas', title: 'Parejas iguales', desc: 'Encuentra las cartas iguales', rounds: 3, gen: gPairs },
+        { id: 'juntas', title: 'Parejas que van juntas', desc: 'La abeja y la miel…', rounds: 3, gen: gMemGoes },
+      ] },
+      { id: 'adivinanzas', n: 10, title: 'Adivinanzas', planet: 'Planeta Misterio', emoji: '❓', color: '#c58bff', missions: [
+        { id: 'adivina', title: 'Adivina, adivinanza', desc: '¿Quién soy?', rounds: 6, gen: gRiddle },
+      ] },
+      { id: 'robot', n: 11, title: 'Robots', planet: 'Fábrica de Robots', emoji: '🤖', color: '#2ed9a3', missions: [
+        { id: 'flechas', title: 'Sigue las flechas', desc: '¿Dónde llega el robot?', rounds: 5, gen: gRobot },
+      ] },
+      { id: 'sudoku', n: 12, title: 'Sudoku', planet: 'Isla Sudoku', emoji: '🏝️', color: '#ff5a6e', missions: [
         { id: 'mini', title: 'Mini sudoku', desc: 'Sin repetir en filas ni columnas', rounds: 3, gen: gSudoku },
       ] },
     ],

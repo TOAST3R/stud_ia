@@ -100,7 +100,7 @@
       <button class="hud-brand" data-nav="home" title="Stud_IA · inicio">${S.brand.mark()}</button>
       <button class="me" data-nav="players" title="Cambiar de jugador"><span class="ava">${CH(me.avatar)}</span><span class="metext"><b>${esc(me.name)}</b><small>${me.curso ? `<em>${cursoName(me.curso)}</em> · ` : ''}${rank()} · cambiar ⇄</small></span></button>
       <button class="pill" data-nav="progress" title="Tu progreso">📊 <span class="hide-s">Progreso</span></button>
-      <span class="pill">⭐ ${totalStars()}</span><span class="pill">💎 ${fmt(me.crystals)}</span>
+      <span class="pill hstars">⭐ ${totalStars()}</span><span class="pill">💎 ${fmt(me.crystals)}</span>
       <button class="icon" data-act="sound" aria-label="Sonido">${data.sound ? '🔊' : '🔇'}</button>
     </header>`;
   }
