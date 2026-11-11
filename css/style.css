@@ -763,3 +763,12 @@ body::before {
 .arrows { font-size: 34px; letter-spacing: 4px; padding: 6px 14px; border-radius: 14px; background: #fff; box-shadow: 0 4px 0 var(--line); }
 .choices.big .choice.ok, .choices.big .choice.wrong { font-size: 46px; }
 @media (max-width: 430px) { .hud .hstars { display: none; } }
+
+/* ---------- logic & geometry levels ---------- */
+.scale { display: flex; align-items: center; justify-content: center; gap: 10px; margin: 8px auto; padding: 8px 14px; width: fit-content; border-radius: 16px; background: #f1e5c7; font-size: 28px; }
+.scale b { font-size: 34px; }
+.magic { display: grid; grid-template-columns: repeat(3, auto); gap: 6px; justify-content: center; margin: 12px auto; font-size: 22px; }
+.magic .dbox, .magic .cell { width: 64px; height: 56px; min-width: 0; }
+.coordgrid { display: grid; gap: 4px; padding: 8px; border-radius: 16px; background: #f1e5c7; font-size: 26px; }
+.coordgrid span { display: grid; place-items: center; width: 1.6em; height: 1.6em; border-radius: 10px; background: #fff; }
+.coordgrid b { display: grid; place-items: center; font: 20px var(--display); color: #5d3fd0; }

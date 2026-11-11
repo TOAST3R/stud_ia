@@ -16,6 +16,14 @@
   const examOf = (sub, sec) => Object.assign({}, DEFAULT_EXAM, sub.exam, sec && sec.exam);
   const unitLabel = (sub, u) => (sub.young || !u.n ? u.title : `Unidad ${u.n} · ${u.title}`);
   const examStars = (nota) => (nota >= 9 ? 3 : nota >= 6 ? 2 : 1);
+  // "young" mode (voice, big pictures) can be set per unit or section; Lógica and
+  // Geometría are young only at the Infantil level.
+  const youngU = (sub, u) => (u && u.young !== undefined ? u.young : !!sub.young);
+  const youngS = (sub, sec) => (sec && sec.young !== undefined ? sec.young : !!sub.young);
+  // Subjects with levels (sec.level 0 Infantil · 1 = 1.º–2.º · 2 = 3.º–4.º · 3 = 5.º–6.º)
+  // open every level up to the player's school year; higher ones need the exam.
+  const LEVEL_OF = { i3: 0, i4: 0, i5: 0, 1: 1, 2: 1, 3: 2, 4: 2, 5: 3, 6: 3 };
+  const myLevel = () => LEVEL_OF[me.curso] ?? 0;
 
   const starKey = (sub, u, m) => `${sub.id}.${u.id}.${m.id}`;
   const totalStars = (p) => Object.values((p || me).stars).reduce((a, b) => a + b, 0);
@@ -45,6 +53,7 @@
   const termSecs = (sub) => sectionsOf(sub).filter((s) => !s.free);
   function secOpen(sub, sec) {
     if (sec.free) return true;
+    if (sec.level !== undefined && sec.level <= myLevel()) return true;
     const terms = termSecs(sub), i = terms.indexOf(sec);
     return i <= 0 || passed(terms[i - 1].key) || unitsOf(sub, sec).some((u) => unitStars(sub, u)) || me.exams[sec.key] !== undefined;
   }
@@ -272,14 +281,17 @@
   const examText = (sub, key) => {
     const best = me.exams[key];
     if (best === undefined) return 'Sin hacer';
-    return sub.young ? '★'.repeat(examStars(best)) : `Nota: ${best}${best >= PASS ? ' ✅' : ' · necesitas un 5'}`;
+    return youngS(sub, sectionsOf(sub).find((x) => x.key === key)) ? '★'.repeat(examStars(best)) : `Nota: ${best}${best >= PASS ? ' ✅' : ' · necesitas un 5'}`;
   };
   let openSecs = {}; // which terms the player unfolded, per subject
   function map(sub) {
     const terms = sectionsOf(sub);
-    const current = terms.find((s) => !s.free && secOpen(sub, s) && !passed(s.key)) || terms[0];
+    // the level of the player's school year comes first; otherwise the first open term not passed
+    const current = terms.find((s) => s.level !== undefined && s.level === myLevel())
+      || terms.find((s) => !s.free && secOpen(sub, s) && !passed(s.key)) || terms[0];
     const isOpen = (sec) => (openSecs[sub.id] && sec.key in openSecs[sub.id] ? openSecs[sub.id][sec.key] : sec === current);
-    const here = sub.units.find((u) => unitOpen(sub, u) && !unitDone(sub, u) && u.section !== 'arcade');
+    const pool = current.id ? unitsOf(sub, current) : sub.units;
+    const here = pool.find((u) => unitOpen(sub, u) && !unitDone(sub, u) && u.section !== 'arcade');
     const node = (u) => {
       const got = unitStars(sub, u), max = u.missions.length * 3, open = unitOpen(sub, u);
       const state = !open ? 'locked' : got === max ? 'done' : got ? 'play' : 'sleep';
@@ -329,7 +341,7 @@
       const units = sub.units.filter((x) => x.section === u.section), prev = units[units.indexOf(u) - 1];
       const msg = prev ? `🔒 Primero completa <b>${prev.planet}</b> (todas sus misiones con al menos una ⭐).` : '🔒 Este trimestre todavía está cerrado.';
       toast(msg);
-      if (sub.young) speak(msg);
+      if (youngU(sub, u)) speak(msg);
     });
     on('.gnode[data-exam]', (b) => {
       const key = b.dataset.exam, isFinal = sub.final && key === sub.final.key;
@@ -384,7 +396,7 @@
       }).join('')}
     </div>`;
     $app.appendChild(wrap);
-    if (sub.young) speak(u.planet);
+    if (youngU(sub, u)) speak(u.planet);
     wrap.addEventListener('click', (e) => {
       const m = e.target.closest('.mission');
       if (m) startMission(sub, u, u.missions.find((x) => x.id === m.dataset.m));
@@ -424,13 +436,14 @@
       <div class="rhost"></div>
     </section>`);
     S.runner($app.querySelector('.rhost'), {
-      avatar: me.avatar, target: to, young: !!sub.young, seconds: sub.young ? 12 : 14,
+      avatar: me.avatar, target: to, young: youngU(sub, to), seconds: youngU(sub, to) ? 12 : 14,
       onEnd: (gems) => { me.crystals += gems; store.save(); then(); },
     });
   }
 
   function play(ses) {
-    const arcade = ses.arcade, young = !!ses.sub.young;
+    const arcade = ses.arcade, young = ses.exam ? youngS(ses.sub, ses.sec) : youngU(ses.sub, ses.unit);
+    ses.young = young;
     ses.rankBefore = rank();
     const total = arcade ? Infinity : ses.queue.length;
     const log = []; // per round: { unit, first, solved }
@@ -665,7 +678,7 @@
       </div>
     </section>`);
     if (r.party) { sfx.win(); fx.confetti(60); }
-    if (ses.sub.young) speak(r.head);
+    if (ses.young) speak(r.head);
     const goNext = () => travel(ses.sub, ses.unit, nextUp.u, () => startMission(ses.sub, nextUp.u, nextUp.m));
     on('[data-act="next"]', goNext);
     on('[data-act="exam"]', () => startExam(ses.sub, examUp));
