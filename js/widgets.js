@@ -444,7 +444,7 @@
         cells += `<button type="button" class="lc ${cls}" data-k="${k}"${fixed(r, c) || over ? ' disabled' : ''}>${v === null ? '' : ch.symbols[v]}</button>`;
       }
       el.innerHTML = `<div class="legend">${ch.symbols.map((s) => `<span>${s}</span>`).join('')}</div>
-        <div class="latin" style="grid-template-columns:repeat(${n},1fr)">${cells}</div>`;
+        <div class="latin" style="grid-template-columns:repeat(${n},minmax(0,1fr));--n:${n}">${cells}</div>`;
       ctx.ready(!over && val.every((row) => row.every((v) => v !== null)));
     }
     el.addEventListener('click', (e) => {
@@ -523,6 +523,169 @@
         }, 1000);
       }
     });
+    return {};
+  };
+
+  // ---------------------------------------------------------------
+  // simon: watch the sequence of coloured pads, then repeat it.
+  //   ch.pads (3–6), ch.length
+  // ---------------------------------------------------------------
+  const PADS = ['#ff4f5e', '#3ec1ff', '#ffd23f', '#2ed9a3', '#8b5cf6', '#ff8a1f'];
+  W.simon = function (ch, el, ctx) {
+    const n = ch.pads, seq = Array.from({ length: ch.length }, () => S.R.int(0, n - 1));
+    ch._seq = seq; // lets the automated tests play
+    let pos = 0, attempts = 0, mistakes = 0, busy = true, over = false;
+    el.innerHTML = `<div class="simon" style="--cols:${n > 4 ? 3 : 2}">${Array.from({ length: n }, (x, i) => `<button type="button" class="pad" data-i="${i}" style="--pc:${PADS[i]}" aria-label="Botón ${i + 1}"></button>`).join('')}</div>
+      <p class="simonmsg">Mira bien…</p>`;
+    const pads = [...el.querySelectorAll('.pad')], msg = el.querySelector('.simonmsg');
+    const flash = (i, ms) => { pads[i].classList.add('lit'); sfx.note(i); setTimeout(() => pads[i].classList.remove('lit'), ms); };
+    function show() {
+      busy = true; pos = 0;
+      msg.textContent = 'Mira bien…';
+      seq.forEach((i, k) => setTimeout(() => flash(i, 420), 700 + k * 650));
+      setTimeout(() => { busy = false; msg.textContent = `¡Tu turno! Repite los ${seq.length} colores.`; }, 700 + seq.length * 650);
+    }
+    el.addEventListener('click', (e) => {
+      const b = e.target.closest('.pad');
+      if (!b || busy || over) return;
+      const i = +b.dataset.i;
+      flash(i, 220);
+      if (i === seq[pos]) {
+        pos++;
+        msg.textContent = `${pos} de ${seq.length}`;
+        if (pos === seq.length) { over = true; msg.textContent = '¡Perfecto!'; ctx.done({ first: !mistakes, solved: true }); }
+        return;
+      }
+      mistakes++; attempts++;
+      if (attempts >= ctx.maxAttempts) { over = true; msg.textContent = 'Era así:'; seq.forEach((j, k) => setTimeout(() => flash(j, 380), 400 + k * 500)); return setTimeout(() => ctx.done({ first: false, solved: false }), 500 + seq.length * 500); }
+      ctx.fail('¡Uy! Ese no era. Mira otra vez la secuencia.');
+      setTimeout(show, 900);
+    });
+    show();
+    return {};
+  };
+
+  // ---------------------------------------------------------------
+  // maze: take the mouse to the cheese. ch.size; arrows, swipe-free buttons or tap
+  // ---------------------------------------------------------------
+  W.maze = function (ch, el, ctx) {
+    const n = ch.size, walls = Array.from({ length: n * n }, () => [true, true, true, true]); // top right bottom left
+    const seen = new Set([0]), stack = [0];
+    while (stack.length) { // carve with a depth-first walk
+      const c = stack[stack.length - 1], r = Math.floor(c / n), k = c % n;
+      const next = [[-1, 0, 0, 2], [0, 1, 1, 3], [1, 0, 2, 0], [0, -1, 3, 1]].filter(([dr, dk]) => r + dr >= 0 && r + dr < n && k + dk >= 0 && k + dk < n && !seen.has((r + dr) * n + k + dk));
+      if (!next.length) { stack.pop(); continue; }
+      const [dr, dk, w, ow] = S.R.pick(next), nb = (r + dr) * n + k + dk;
+      walls[c][w] = false; walls[nb][ow] = false; seen.add(nb); stack.push(nb);
+    }
+    let at = 0, moves = 0, over = false;
+    const goal = n * n - 1;
+    ch._walls = walls; // lets the automated tests play
+    el.innerHTML = `<div class="maze" style="--n:${n}">${walls.map((w, i) => `<span class="mz${w[0] ? ' t' : ''}${w[1] ? ' r' : ''}${w[2] ? ' b' : ''}${w[3] ? ' l' : ''}" data-i="${i}"></span>`).join('')}</div>
+      <div class="mzpad"><span></span><button type="button" data-d="0">⬆️</button><span></span><button type="button" data-d="3">⬅️</button><button type="button" data-d="2">⬇️</button><button type="button" data-d="1">➡️</button></div>`;
+    const cells = [...el.querySelectorAll('.mz')];
+    const paint = () => { cells.forEach((c, i) => (c.textContent = i === at ? ch.hero : i === goal ? ch.prize : '')); };
+    const DIR = [[-1, 0], [0, 1], [1, 0], [0, -1]];
+    function go(d) {
+      if (over || walls[at][d]) { if (!over) { sfx.bad(); el.querySelector('.maze').classList.remove('bump'); void el.offsetWidth; el.querySelector('.maze').classList.add('bump'); } return; }
+      at = (Math.floor(at / n) + DIR[d][0]) * n + (at % n) + DIR[d][1];
+      moves++; sfx.tap(); paint();
+      if (at === goal) { over = true; cells[goal].classList.add('win'); ctx.done({ first: true, solved: true }); }
+    }
+    el.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-d]');
+      if (b) return go(+b.dataset.d);
+      const c = e.target.closest('.mz');
+      if (!c) return;
+      const i = +c.dataset.i, dr = Math.floor(i / n) - Math.floor(at / n), dk = (i % n) - (at % n);
+      if (Math.abs(dr) + Math.abs(dk) === 1) go(dr === -1 ? 0 : dk === 1 ? 1 : dr === 1 ? 2 : 3);
+    });
+    paint();
+    return { key(e) { const d = { ArrowUp: 0, ArrowRight: 1, ArrowDown: 2, ArrowLeft: 3 }[e.key]; if (d === undefined) return false; go(d); return true; } };
+  };
+
+  // ---------------------------------------------------------------
+  // tictactoe against the computer. ch.level 0 random · 1 blocks · 2 never loses
+  // ---------------------------------------------------------------
+  const LINES3 = [[0, 1, 2], [3, 4, 5], [6, 7, 8], [0, 3, 6], [1, 4, 7], [2, 5, 8], [0, 4, 8], [2, 4, 6]];
+  const winner = (b) => { for (const [a, c, d] of LINES3) if (b[a] && b[a] === b[c] && b[a] === b[d]) return b[a]; return b.every(Boolean) ? 'draw' : null; };
+  function best(b, me) { // minimax
+    const w = winner(b);
+    if (w === 'O') return { s: 1 }; if (w === 'X') return { s: -1 }; if (w === 'draw') return { s: 0 };
+    let pick = null;
+    b.forEach((v, i) => {
+      if (v) return;
+      b[i] = me; const r = best(b, me === 'O' ? 'X' : 'O'); b[i] = null;
+      if (!pick || (me === 'O' ? r.s > pick.s : r.s < pick.s)) pick = { s: r.s, i };
+    });
+    return pick;
+  }
+  W.ttt = function (ch, el, ctx) {
+    let b = Array(9).fill(null), attempts = 0, over = false, busy = false;
+    el.innerHTML = `<p class="tttmsg">Tú eres ${ch.me}. ¡Haz tres en raya!</p><div class="ttt">${b.map((x, i) => `<button type="button" class="tc" data-i="${i}"></button>`).join('')}</div>`;
+    const cs = [...el.querySelectorAll('.tc')], msg = el.querySelector('.tttmsg');
+    const paint = (line) => cs.forEach((c, i) => { c.textContent = b[i] === 'X' ? ch.me : b[i] === 'O' ? ch.cpu : ''; c.disabled = !!b[i] || over; c.classList.toggle('hl', !!line && line.includes(i)); });
+    const lineOf = () => LINES3.find(([a, c, d]) => b[a] && b[a] === b[c] && b[a] === b[d]);
+    function cpuMove() {
+      const free = b.map((v, i) => (v ? -1 : i)).filter((i) => i >= 0);
+      let i;
+      if (ch.level === 2) i = best(b, 'O').i;
+      else if (ch.level === 1) {
+        const find = (who) => free.find((f) => { b[f] = who; const w = winner(b) === who; b[f] = null; return w; });
+        i = find('O') ?? find('X') ?? (b[4] ? S.R.pick(free) : 4);
+      } else i = S.R.pick(free);
+      b[i] = 'O';
+    }
+    function end() {
+      const w = winner(b);
+      if (!w) return false;
+      over = true; paint(lineOf());
+      if (w === 'X') { msg.textContent = '¡Has ganado! 🎉'; ctx.done({ first: !attempts, solved: true }); }
+      else if (w === 'draw') { msg.textContent = 'Empate. ¡Muy bien defendido!'; ctx.done({ first: ch.level === 2 && !attempts, solved: true }); }
+      else {
+        attempts++;
+        if (attempts >= ctx.maxAttempts) { msg.textContent = 'Ha ganado el ordenador.'; ctx.done({ first: false, solved: false }); }
+        else { ctx.fail('¡Ha ganado el ordenador! Fíjate en sus jugadas y prueba otra vez.'); setTimeout(() => { b = Array(9).fill(null); over = false; msg.textContent = `Revancha. Tú eres ${ch.me}.`; paint(); }, 1400); }
+      }
+      return true;
+    }
+    el.addEventListener('click', (e) => {
+      const c = e.target.closest('.tc');
+      if (!c || over || busy || b[+c.dataset.i]) return;
+      b[+c.dataset.i] = 'X'; sfx.tap(); paint();
+      if (end()) return;
+      busy = true;
+      setTimeout(() => { cpuMove(); busy = false; paint(); end(); }, 450);
+    });
+    paint();
+    return {};
+  };
+
+  // ---------------------------------------------------------------
+  // slide: sliding puzzle (3×3 or 4×4). ch.size, ch.shuffle (random moves)
+  // ---------------------------------------------------------------
+  W.slide = function (ch, el, ctx) {
+    const n = ch.size, N = n * n;
+    let t = Array.from({ length: N }, (x, i) => (i + 1) % N), hole = N - 1, last = -1, moves = 0, over = false;
+    const nbrs = (h) => [h - n, h + n, h % n ? h - 1 : -1, (h + 1) % n ? h + 1 : -1].filter((x) => x >= 0 && x < N);
+    for (let k = 0; k < ch.shuffle; k++) { // only legal moves: always solvable
+      const opts = nbrs(hole).filter((x) => x !== last), m = S.R.pick(opts);
+      [t[hole], t[m]] = [t[m], t[hole]]; last = hole; hole = m;
+    }
+    if (t.every((v, i) => v === (i + 1) % N)) { const m = nbrs(hole)[0]; [t[hole], t[m]] = [t[m], t[hole]]; hole = m; }
+    ch._tiles = () => t.slice(); // lets the automated tests play
+    el.innerHTML = `<p class="slidemsg">Movimientos: <b>0</b></p><div class="slide" style="--n:${n}"></div>`;
+    const box = el.querySelector('.slide'), mv = el.querySelector('.slidemsg b');
+    const paint = () => { box.innerHTML = t.map((v, i) => (v ? `<button type="button" class="tile${v === i + 1 ? ' home' : ''}" data-i="${i}">${v}</button>` : '<span class="hole"></span>')).join(''); };
+    el.addEventListener('click', (e) => {
+      const b = e.target.closest('.tile');
+      if (!b || over) return;
+      const i = +b.dataset.i;
+      if (!nbrs(hole).includes(i)) return sfx.bad();
+      [t[hole], t[i]] = [t[i], t[hole]]; hole = i; moves++; mv.textContent = moves; sfx.tap(); paint();
+      if (t.every((v, k) => v === (k + 1) % N)) { over = true; box.classList.add('solved'); ctx.done({ first: true, solved: true }); }
+    });
+    paint();
     return {};
   };
 })();

@@ -18,8 +18,9 @@
   const examStars = (nota) => (nota >= 9 ? 3 : nota >= 6 ? 2 : 1);
   // "young" mode (voice, big pictures) can be set per unit or section; Lógica and
   // Geometría are young only at the Infantil level.
-  const youngU = (sub, u) => (u && u.young !== undefined ? u.young : !!sub.young);
-  const youngS = (sub, sec) => (sec && sec.young !== undefined ? sec.young : !!sub.young);
+  // (sub.youngByPlayer: it depends on the player, for subjects open to every age)
+  const youngU = (sub, u) => (u && u.young !== undefined ? u.young : sub.youngByPlayer ? littleOne(me) : !!sub.young);
+  const youngS = (sub, sec) => (sec && sec.young !== undefined ? sec.young : sub.youngByPlayer ? littleOne(me) : !!sub.young);
   // Subjects with levels (sec.level 0 Infantil · 1 = 1.º–2.º · 2 = 3.º–4.º · 3 = 5.º–6.º)
   // open every level up to the player's school year; higher ones need the exam.
   const LEVEL_OF = { i3: 0, i4: 0, i5: 0, 1: 1, 2: 1, 3: 2, 4: 2, 5: 3, 6: 3 };
