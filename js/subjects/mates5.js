@@ -2,8 +2,10 @@
 //
 // HOW TO ADD CONTENT
 //   A subject is { id, title, emoji, tagline, ages: [min, max], units: [...] } registered in
-//   StudIA.subjects. Optional: young: true (big pictures + questions read aloud) and
-//   exam: { title, label, emoji, rounds }. Players see the subjects for their age first.
+//   StudIA.subjects. Optional: young: true (big pictures + questions read aloud),
+//   exam: { title, label, emoji, rounds } and grades: ['5'] (school years that see it first).
+//   Courses are split in terms with trimestres() in primaria.js: each term has an exam,
+//   opens when the previous term's exam is passed, and its planets open one by one.
 //   A unit is a planet: { id, n, title, planet, emoji, color, missions: [...] }.
 //   A mission is { id, title, desc, rounds, gen(lvl, i) } where gen returns one challenge:
 //     lvl goes 0 → 2 (easy → hard) through the mission, i is the round number

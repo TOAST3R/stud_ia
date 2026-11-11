@@ -488,6 +488,41 @@
     arcade([AC('mental', 'Cálculo mental', '+99, −99, × 100…', at(G.gMental, 2), 60, [6, 10, 14]), AC('cuadrados', 'Cuadrados y raíces', 'De 1 × 1 a 15 × 15', G.gSqFast, 45, [8, 13, 18])]),
   ]);
 
+  // ---------- school terms (trimestres) ----------
+  // Each course is split in three terms with an exam each, plus a final exam of the
+  // whole course. The arcade is a free section. Units are reordered to match the plan.
+  const TERMS = [['1.er trimestre', '🍂'], ['2.º trimestre', '❄️'], ['3.er trimestre', '🌷']];
+  function trimestres(sub, plan, subtitles) {
+    const byId = (id) => {
+      const u = sub.units.find((x) => x.id === id);
+      if (!u) throw new Error(`${sub.id}: no unit ${id}`);
+      return u;
+    };
+    const ordered = [];
+    sub.sections = plan.map((ids, i) => {
+      ids.forEach((id) => { const u = byId(id); u.section = `t${i + 1}`; ordered.push(u); });
+      return {
+        id: `t${i + 1}`, key: sub.id === 'mates5' && i === 0 ? 'mates5' : `${sub.id}.t${i + 1}`, // 5.º keeps its old exam mark
+        emoji: TERMS[i][1], title: TERMS[i][0], subtitle: (subtitles && subtitles[i]) || '',
+        exam: { title: `Examen del ${TERMS[i][0]}`, label: 'Examen', emoji: '🕳️', rounds: 10 },
+      };
+    });
+    const rest = sub.units.filter((u) => !ordered.includes(u));
+    rest.forEach((u) => { if (u.id !== 'arcade') throw new Error(`${sub.id}: unit ${u.id} is in no term`); u.section = 'arcade'; });
+    sub.units = ordered.concat(rest);
+    if (rest.length) sub.sections.push({ id: 'arcade', key: `${sub.id}.arcade`, emoji: '🕹️', title: 'Arcade', subtitle: 'Contra el reloj. Siempre abierto.', exam: false, free: true });
+    sub.final = { key: `${sub.id}.final`, title: 'Examen final de curso', label: 'Todo el curso', emoji: '🏆', rounds: 15 };
+  }
+  trimestres(S.subjects.mates1, [['numeros', 'sumas', 'restas'], ['problemas', 'series', 'dinero'], ['tiempo', 'formas']]);
+  trimestres(S.subjects.mates2, [['numeros', 'sumas'], ['multiplicar', 'reparto', 'problemas'], ['medida', 'tiempo', 'geometria']]);
+  trimestres(S.subjects.mates3, [['numeros', 'sumas', 'angulos', 'multiplicacion'], ['division', 'figuras'], ['fracciones', 'medida', 'tiempo', 'cuerpos']]);
+  trimestres(S.subjects.mates4, [['numeros', 'sumas', 'multiplicacion'], ['division', 'geometria', 'fracciones'], ['decimales', 'medida', 'datos', 'cuerpos']]);
+  trimestres(S.subjects.mates5, [
+    ['est', 'u3', 'u4', 'u5', 'u6', 'u7', 'u8', 'u9', 'u10', 'u11', 'u12', 'u13', 'u14', 'u15', 'u16', 'u17', 'u18', 'u19', 'u20'],
+    ['divisibilidad', 'fracciones', 'decimales', 'potencias'], ['geometria', 'medida', 'tiempo', 'datos'],
+  ], ['Cuadernillo 1 de Innovamat', 'Divisibilidad, fracciones, decimales y potencias', 'Geometría, medida, tiempo y estadística']);
+  trimestres(S.subjects.mates6, [['numeros', 'divisibilidad', 'enteros'], ['fracciones', 'decimales', 'potencias'], ['proporcion', 'medida', 'datos']]);
+
   // 5.º keeps its own file; it only needs the school year so it shows first for 5.º
   S.subjects.mates5.grades = ['5'];
   S.subjects.mates5.ages = [9, 11];

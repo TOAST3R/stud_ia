@@ -27,6 +27,44 @@
   const cursoName = (c) => (CURSOS.find((x) => x[0] === c) || [])[1];
   const forAge = (s, p) => (p.curso && s.grades ? s.grades.includes(p.curso) : !s.ages || (p.age >= s.ages[0] && p.age <= s.ages[1]));
   const cursoChips = (sel) => `<div class="ages cursos">${CURSOS.map(([id, name]) => `<button class="age curso${id === sel ? ' sel' : ''}" data-c="${id}">${name}</button>`).join('')}</div>`;
+  const littleOne = (p) => ['i3', 'i4', 'i5', '1'].includes(p.curso);
+  // who is playing and in which school year, on every screen
+  const whoChip = () => `<span class="who">${CH(me.avatar)}<b>${esc(me.name)}</b>${me.curso ? `<i>${cursoName(me.curso)}</i>` : ''}</span>`;
+
+  // ---------- locks ----------
+  // Terms open in order: a term opens when the previous term's exam is passed
+  // (5 or more). Inside a term, a planet opens when the previous one is done
+  // (every mission with at least one star) and the term exam when all planets
+  // are done. The final exam opens when the three term exams are passed.
+  // Anything already played stays open, so older progress is never hidden.
+  const PASS = 5;
+  const missionsOf = (u) => u.missions.filter((m) => !m.arcade);
+  const unitStars = (sub, u) => u.missions.reduce((a, m) => a + (me.stars[starKey(sub, u, m)] || 0), 0);
+  const unitDone = (sub, u) => missionsOf(u).every((m) => me.stars[starKey(sub, u, m)]);
+  const passed = (key) => (me.exams[key] ?? -1) >= PASS;
+  const termSecs = (sub) => sectionsOf(sub).filter((s) => !s.free);
+  function secOpen(sub, sec) {
+    if (sec.free) return true;
+    const terms = termSecs(sub), i = terms.indexOf(sec);
+    return i <= 0 || passed(terms[i - 1].key) || unitsOf(sub, sec).some((u) => unitStars(sub, u)) || me.exams[sec.key] !== undefined;
+  }
+  function unitOpen(sub, u) {
+    const sec = sectionsOf(sub).find((s) => !s.id || s.id === u.section);
+    if (sec.free) return true;
+    if (!secOpen(sub, sec)) return false;
+    const units = unitsOf(sub, sec), i = units.indexOf(u);
+    return i <= 0 || unitDone(sub, units[i - 1]) || unitStars(sub, u) > 0;
+  }
+  const examOpen = (sub, sec) => secOpen(sub, sec) && (unitsOf(sub, sec).every((u) => unitDone(sub, u)) || me.exams[sec.key] !== undefined);
+  const finalOpen = (sub) => !!sub.final && (termSecs(sub).every((s) => passed(s.key)) || me.exams[sub.final.key] !== undefined);
+  function toast(msg) {
+    document.querySelectorAll('.toast').forEach((t) => t.remove());
+    const t = document.createElement('div');
+    t.className = 'toast';
+    t.innerHTML = msg;
+    document.body.appendChild(t);
+    setTimeout(() => t.remove(), 3200);
+  }
 
   let keyHandler = null, tick = null;
   document.addEventListener('keydown', (e) => { if (keyHandler) keyHandler(e); });
@@ -59,13 +97,17 @@
 
   function hud() {
     return `<header class="hud">
-      <button class="me" data-nav="players" title="Cambiar de jugador"><span class="ava">${CH(me.avatar)}</span><span><b>${esc(me.name)}</b><small>${rank()} · cambiar ⇄</small></span></button>
+      <button class="me" data-nav="players" title="Cambiar de jugador"><span class="ava">${CH(me.avatar)}</span><span class="metext"><b>${esc(me.name)}</b><small>${me.curso ? `<em>${cursoName(me.curso)}</em> · ` : ''}${rank()} · cambiar ⇄</small></span></button>
+      <button class="pill" data-nav="home" title="Inicio">🏠</button>
+      <button class="pill" data-nav="progress" title="Tu progreso">📊 <span class="hide-s">Progreso</span></button>
       <span class="pill">⭐ ${totalStars()}</span><span class="pill">💎 ${fmt(me.crystals)}</span>
       <button class="icon" data-act="sound" aria-label="Sonido">${data.sound ? '🔊' : '🔇'}</button>
     </header>`;
   }
   function bindHud(redraw) {
     on('[data-nav="players"]', players);
+    on('[data-nav="progress"]', progress);
+    on('.hud [data-nav="home"]', home);
     on('[data-act="sound"]', () => { data.sound = !data.sound; store.save(); redraw(); });
   }
 
@@ -76,13 +118,13 @@
     store.save();
     me = store.player;
     if (!data.players.length) return editPlayer(null);
-    // a player carried over from the first version is asked his age when he
-    // is picked, never before the "¿Quién juega?" screen
+    // a player from an older version without a school year is asked for it when
+    // he is picked, never before the "¿Quién juega?" screen; his progress is kept
     if (data.players.length === 1) {
       me = data.players[0];
       data.current = me.id;
       store.save();
-      return me.age ? home() : editPlayer(me);
+      return me.curso ? home() : editPlayer(me);
     }
     players();
   }
@@ -92,7 +134,7 @@
       <h1 class="title3d">¿Quién juega?</h1>
       <div class="players">
         ${data.players.map((p) => `<div class="pcard" data-tilt>
-          <button class="pplay" data-id="${p.id}"><span class="podium">${CH(p.avatar)}</span><b>${esc(p.name)}</b><small>${p.age ? `${p.curso ? cursoName(p.curso) : `${p.age} años`} · ` : 'falta tu edad · '}⭐ ${totalStars(p)}</small></button>
+          <button class="pplay" data-id="${p.id}"><span class="podium">${CH(p.avatar)}</span><b>${esc(p.name)}</b><small>${p.curso ? cursoName(p.curso) : 'falta tu curso'} · ⭐ ${totalStars(p)}</small></button>
           <button class="icon pedit" data-id="${p.id}" aria-label="Editar a ${esc(p.name)}">✏️</button>
         </div>`).join('')}
         <button class="pcard pnew" data-tilt><span class="podium empty">+</span><b>Nuevo jugador</b><small>Para otro hermano</small></button>
@@ -104,7 +146,7 @@
       data.current = me.id;
       store.save();
       sfx.ok();
-      me.age ? home() : editPlayer(me);
+      me.curso ? home() : editPlayer(me);
     });
     on('.pedit', (b) => editPlayer(byId(b.dataset.id)));
     on('.pnew', () => editPlayer(null));
@@ -113,18 +155,16 @@
   // Same form for the first player, a new one, or one carried over from the
   // first version (setup: his progress is kept, only name/age/avatar are asked).
   function editPlayer(p) {
-    const isNew = !p, setup = !!p && !p.age, first = !data.players.length || (setup && data.players.length === 1);
-    let age = p ? p.age : null, avatar = p ? S.charId(p.avatar) : 'astro', curso = p ? p.curso || null : null;
+    const isNew = !p, setup = !!p && !p.curso, first = !data.players.length || (setup && data.players.length === 1);
+    let avatar = p ? S.charId(p.avatar) : 'astro', curso = p ? p.curso || null : null;
     const unlocked = S.CHARS.filter((a) => a.need <= (p ? totalStars(p) : 0));
     render(`<section class="welcome">
       ${first ? '' : '<button class="icon back" aria-label="Volver">←</button>'}
       <div class="logo">${CH(avatar, 'happy')}</div>
-      <h1>${setup ? 'Tu edad' : first ? 'StudIA' : isNew ? 'Nuevo jugador' : 'Editar jugador'}</h1>
-      ${setup ? `<p class="lead">¡Hola, ${esc(p.name)}! Tu progreso está guardado (⭐ ${totalStars(p)}). Solo falta que nos digas tu edad.</p>`
+      <h1>${setup ? 'Tu curso' : first ? 'StudIA' : isNew ? 'Nuevo jugador' : 'Editar jugador'}</h1>
+      ${setup ? `<p class="lead">¡Hola, ${esc(p.name)}! Tu progreso está guardado (⭐ ${totalStars(p)}). Solo falta que elijas tu curso.</p>`
         : first ? '<p class="lead">Una aventura espacial para aprender y preparar exámenes.</p>' : ''}
       <label>¿Cómo te llamas?<input id="name" maxlength="14" autocomplete="off" placeholder="Tu nombre" value="${esc(p ? p.name : '')}"></label>
-      <p class="q">¿Cuántos años tienes?</p>
-      <div class="ages">${[3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((a) => `<button class="age${a === age ? ' sel' : ''}" data-a="${a}">${a}</button>`).join('')}</div>
       <p class="q">¿En qué curso estás?</p>
       ${cursoChips(curso)}
       <p class="q">Elige tu personaje</p>
@@ -134,12 +174,8 @@
     </section>`);
     on('.curso', (b) => {
       curso = b.dataset.c;
+      $app.querySelector('.cursos').classList.remove('need');
       $app.querySelectorAll('.curso').forEach((x) => x.classList.toggle('sel', x === b));
-    });
-    on('.age:not(.curso)', (b) => {
-      age = +b.dataset.a;
-      $app.querySelector('.ages').classList.remove('need');
-      $app.querySelectorAll('.age:not(.curso)').forEach((x) => x.classList.toggle('sel', x === b));
     });
     on('.avatar', (b) => {
       avatar = b.dataset.e;
@@ -156,8 +192,8 @@
       start();
     });
     const save = () => {
-      if (!age) {
-        const ages = $app.querySelector('.ages');
+      if (!curso) {
+        const ages = $app.querySelector('.cursos');
         ages.classList.remove('need');
         void ages.offsetWidth; // restart the shake animation
         ages.classList.add('need');
@@ -165,9 +201,9 @@
       }
       const name = document.getElementById('name').value.trim() || `Jugador ${data.players.length + (isNew ? 1 : 0)}`;
       if (isNew) {
-        p = store.newPlayer({ name, age, avatar, curso, asked: true });
+        p = store.newPlayer({ name, avatar, curso, asked: true });
         data.players.push(p);
-      } else Object.assign(p, { name, age, avatar, curso, asked: true });
+      } else Object.assign(p, { name, avatar, curso, asked: true });
       me = p;
       data.current = p.id;
       store.save();
@@ -193,10 +229,10 @@
     const stars = totalStars();
     const next = S.CHARS.find((a) => a.need > stars);
     render(`${hud()}<section class="home">
-      ${me.curso ? '' : `<div class="askcurso"><b>¿En qué curso estás?</b> Así te enseño primero tus mates.${cursoChips(null)}</div>`}
       <div class="greet">
         <div class="hero-char">${CH(me.avatar, 'happy')}</div>
-        <div class="greet-talk"><h1 class="title3d">¡Hola, ${esc(me.name)}!</h1><p>¿Qué galaxia exploramos hoy?</p></div>
+        <div class="greet-talk"><h1 class="title3d">¡Hola, ${esc(me.name)}!</h1><p>${cursoName(me.curso) ? `Estás en ${cursoName(me.curso)}. ` : ''}¿Qué galaxia exploramos hoy?</p>
+          <button class="btn ghost small" data-nav="progress">📊 Ver mi progreso</button></div>
       </div>
       <div class="subjects">${mine.map(subjectCard).join('')}
         <div class="subject ghost"><span class="semoji">🔭</span><b>Más galaxias</b><small>Pronto habrá nuevas asignaturas</small></div>
@@ -211,77 +247,126 @@
     bindHud(home);
     on('.subject[data-sub]', (b) => map(S.subjects[b.dataset.sub]));
     on('button.avatar', (b) => { me.avatar = b.dataset.e; store.save(); home(); });
-    on('.askcurso .curso', (b) => { me.curso = b.dataset.c; store.save(); sfx.ok(); home(); });
-    if (me.age < 7) speak(`¡Hola, ${me.name}! Elige un juego.`);
+    if (littleOne(me)) speak(`¡Hola, ${me.name}! Elige un juego.`);
   }
 
   // ---------------- planet map ----------------
-  // The map is a winding board-game track. Planets have faces: sleepy before you
-  // start, smiling while you play, sunglasses when every mission has 3 stars.
-  // Your character waits on the next planet to play; exams are black holes.
-  const TRACK_X = [22, 70, 40, 78, 26, 60];
-  const STEP = 168;
+  // Each term is a compact zigzag grid of planets joined by a dotted trail, so a
+  // whole term fits on one screen. Only the current term is open; the others fold
+  // (tap to open). Planets have faces: sleepy before you start, smiling while you
+  // play, sunglasses when finished. Locked planets show a padlock.
   function planetFace(state) {
     const O = '#24164f';
     if (state === 'done') {
       return `<svg viewBox="0 0 100 60" class="face" aria-hidden="true"><path d="M14 18 H86 L82 32 Q70 40 58 32 L54 24 H46 L42 32 Q30 40 18 32 Z" fill="${O}"/><path d="M22 22 L30 22" stroke="#fff" stroke-width="3" stroke-linecap="round" opacity=".7"/><path d="M30 44 Q50 60 70 44" fill="#fff" stroke="${O}" stroke-width="4" stroke-linejoin="round"/></svg>`;
     }
-    if (state === 'sleep') {
-      return `<svg viewBox="0 0 100 60" class="face" aria-hidden="true"><path d="M22 26 Q31 34 40 26 M60 26 Q69 34 78 26" fill="none" stroke="${O}" stroke-width="4.5" stroke-linecap="round"/><ellipse cx="50" cy="46" rx="5" ry="4" fill="${O}"/><text x="84" y="14" class="zz">z</text><text x="92" y="4" class="zz small">z</text></svg>`;
+    if (state === 'sleep' || state === 'locked') {
+      return `<svg viewBox="0 0 100 60" class="face" aria-hidden="true"><path d="M22 26 Q31 34 40 26 M60 26 Q69 34 78 26" fill="none" stroke="${O}" stroke-width="4.5" stroke-linecap="round"/><ellipse cx="50" cy="46" rx="5" ry="4" fill="${O}"/>${state === 'sleep' ? '<text x="84" y="14" class="zz">z</text><text x="92" y="4" class="zz small">z</text>' : ''}</svg>`;
     }
     return `<svg viewBox="0 0 100 60" class="face" aria-hidden="true"><g class="eyes"><circle cx="31" cy="26" r="9" fill="#fff" stroke="${O}" stroke-width="3.5"/><circle cx="34" cy="27" r="5" fill="${O}"/><circle cx="69" cy="26" r="9" fill="#fff" stroke="${O}" stroke-width="3.5"/><circle cx="72" cy="27" r="5" fill="${O}"/></g><path d="M36 42 Q50 54 64 42" fill="none" stroke="${O}" stroke-width="4.5" stroke-linecap="round"/></svg>`;
   }
+  const BOSS_FACE = '<svg viewBox="0 0 100 60" class="face" aria-hidden="true"><path d="M20 18 L42 26 M80 18 L58 26" stroke="#ffd23f" stroke-width="5" stroke-linecap="round"/><circle cx="34" cy="32" r="7" fill="#ffd23f"/><circle cx="66" cy="32" r="7" fill="#ffd23f"/><path d="M34 48 Q50 40 66 48" fill="none" stroke="#ffd23f" stroke-width="4.5" stroke-linecap="round"/></svg>';
+  const examText = (sub, key) => {
+    const best = me.exams[key];
+    if (best === undefined) return 'Sin hacer';
+    return sub.young ? '★'.repeat(examStars(best)) : `Nota: ${best}${best >= PASS ? ' ✅' : ' · necesitas un 5'}`;
+  };
+  let openSecs = {}; // which terms the player unfolded, per subject
   function map(sub) {
-    const stateOf = (u) => {
-      const got = u.missions.reduce((a, m) => a + (me.stars[starKey(sub, u, m)] || 0), 0), max = u.missions.length * 3;
-      return { got, max, state: got === max ? 'done' : got ? 'play' : 'sleep' };
+    const terms = sectionsOf(sub);
+    const current = terms.find((s) => !s.free && secOpen(sub, s) && !passed(s.key)) || terms[0];
+    const isOpen = (sec) => (openSecs[sub.id] && sec.key in openSecs[sub.id] ? openSecs[sub.id][sec.key] : sec === current);
+    const here = sub.units.find((u) => unitOpen(sub, u) && !unitDone(sub, u) && u.section !== 'arcade');
+    const node = (u) => {
+      const got = unitStars(sub, u), max = u.missions.length * 3, open = unitOpen(sub, u);
+      const state = !open ? 'locked' : got === max ? 'done' : got ? 'play' : 'sleep';
+      const st = Math.round((got / max) * 3);
+      return `<button class="gnode ${state}${u === here ? ' here' : ''}" data-u="${u.id}" style="--c:${u.color}" ${open ? '' : 'aria-disabled="true"'}>
+        <span class="orb">${planetFace(state)}<span class="badge">${open ? u.emoji : '🔒'}</span>${u === here ? `<span class="me-on">${CH(me.avatar, 'happy')}</span>` : ''}</span>
+        <span class="tag"><b>${u.planet}</b><small>${unitLabel(sub, u)}</small><span class="pst">${'★'.repeat(st)}<i>${'★'.repeat(3 - st)}</i></span></span>
+      </button>`;
     };
-    // the character waits on the first planet that is not finished
-    const here = sub.units.find((u) => stateOf(u).state !== 'done');
-    const track = (sec) => {
-      const units = unitsOf(sub, sec), withBoss = sec.exam !== false, n = units.length + (withBoss ? 1 : 0);
-      const pos = (i) => [TRACK_X[i % TRACK_X.length], i * STEP + 150];
-      let path = '';
-      for (let i = 0; i < n; i++) {
-        const [x, y] = pos(i);
-        if (!i) path += `M${x} ${y}`;
-        else { const [px, py] = pos(i - 1); path += ` C${px} ${py + STEP / 2} ${x} ${y - STEP / 2} ${x} ${y}`; }
-      }
-      const nodes = units.map((u, i) => {
-        const { got, max, state } = stateOf(u), [x, y] = pos(i), size = 96 + ((u.id.length * 7 + i * 13) % 34);
-        return `<button class="pnode ${state}${u === here ? ' here' : ''}" data-u="${u.id}" style="--c:${u.color};left:${x}%;top:${y}px;--s:${size}px;--t:${((i * 37) % 9) - 4}deg">
-          <span class="orb">${i % 3 === 1 ? '<span class="ring"></span>' : ''}${i % 4 === 2 ? '<span class="moon"></span>' : ''}${planetFace(state)}<span class="badge">${u.emoji}</span></span>
-          ${u === here ? `<span class="me-on">${CH(me.avatar, 'happy')}<i>¡Aquí!</i></span>` : ''}
-          <span class="tag"><small>${unitLabel(sub, u)}</small><b>${u.planet}</b><span class="pst">${'★'.repeat(Math.round((got / max) * 3))}<i>${'★'.repeat(3 - Math.round((got / max) * 3))}</i> ${got}/${max}</span></span>
-        </button>`;
-      });
-      if (withBoss) {
-        const best = me.exams[sec.key], ex = examOf(sub, sec), [x, y] = pos(units.length);
-        const bestText = best === undefined ? (sub.young ? 'Preguntas de todos los planetas' : 'Sin pistas. ¿Te atreves?')
-          : sub.young ? `Tu mejor resultado: ${'★'.repeat(examStars(best))}` : `Tu mejor nota: ${best} / 10`;
-        nodes.push(`<button class="pnode boss" data-exam="${sec.key}" style="left:${x}%;top:${y}px;--s:132px">
-          <span class="orb"><span class="swirl"></span><svg viewBox="0 0 100 60" class="face" aria-hidden="true"><path d="M20 18 L42 26 M80 18 L58 26" stroke="#ffd23f" stroke-width="5" stroke-linecap="round"/><circle cx="34" cy="32" r="7" fill="#ffd23f"/><circle cx="66" cy="32" r="7" fill="#ffd23f"/><path d="M34 48 Q50 40 66 48" fill="none" stroke="#ffd23f" stroke-width="4.5" stroke-linecap="round"/></svg></span>
-          <span class="tag boss-tag"><small>${ex.label} · ${ex.rounds} preguntas</small><b>${ex.title}</b><span class="pst">${bestText}</span></span>
-        </button>`);
-      }
-      return `<div class="track" style="height:${(n - 1) * STEP + 300}px">
-        <svg class="trail" viewBox="0 0 100 ${(n - 1) * STEP + 300}" preserveAspectRatio="none" aria-hidden="true">
-          <path d="${path}" class="trail-glow"/><path d="${path}" class="trail-dots"/>
-        </svg>${nodes.join('')}</div>`;
+    const boss = (sec, isFinal) => {
+      const ex = isFinal ? sub.final : examOf(sub, sec), key = isFinal ? sub.final.key : sec.key;
+      const open = isFinal ? finalOpen(sub) : examOpen(sub, sec);
+      return `<button class="gnode boss${isFinal ? ' final' : ''}${open ? '' : ' locked'}" data-exam="${key}" ${open ? '' : 'aria-disabled="true"'}>
+        <span class="orb"><span class="swirl"></span>${isFinal ? '<span class="trophy">🏆</span>' : BOSS_FACE}<span class="badge">${open ? (isFinal ? '🏆' : '📝') : '🔒'}</span></span>
+        <span class="tag boss-tag"><b>${ex.title}</b><small>${ex.rounds} preguntas</small><span class="pst">${open ? examText(sub, key) : '🔒 Completa los planetas'}</span></span>
+      </button>`;
+    };
+    const term = (sec) => {
+      const units = unitsOf(sub, sec), open = secOpen(sub, sec), unfolded = open && isOpen(sec);
+      const got = units.reduce((a, u) => a + unitStars(sub, u), 0), max = units.reduce((a, u) => a + u.missions.length * 3, 0);
+      const terms2 = termSecs(sub), prev = terms2[terms2.indexOf(sec) - 1];
+      const status = sec.free ? '¡Siempre abierto!' : !open ? `🔒 Aprueba el ${examOf(sub, prev).title.replace('Examen del ', 'examen del ')} para abrirlo`
+        : passed(sec.key) ? `✅ Aprobado · nota ${me.exams[sec.key]}` : `⭐ ${got} / ${max}`;
+      return `<section class="term${open ? '' : ' locked'}${unfolded ? ' open' : ''}" data-key="${sec.key}">
+        ${sec.title ? `<button class="termhead" data-fold="${sec.key}" ${open ? '' : 'aria-disabled="true"'}>
+          <span class="tname">${sec.emoji || ''} ${sec.title}</span>${sec.subtitle ? `<small>${sec.subtitle}</small>` : ''}
+          <span class="tstatus">${status}</span>${open ? `<span class="tbar"><i style="width:${max ? (got / max) * 100 : 0}%"></i></span>` : ''}
+          ${open ? `<span class="fold">${unfolded ? '▲' : '▼'}</span>` : ''}
+        </button>` : ''}
+        ${unfolded ? `<div class="grid">${units.map(node).join('')}${sec.exam === false ? '' : boss(sec)}<svg class="gtrail" aria-hidden="true"></svg></div>` : ''}
+      </section>`;
     };
     render(`${hud()}<section class="map">
       <h1 class="title3d">${sub.emoji} ${sub.title}</h1>
       <div class="ufo" aria-hidden="true">${CH('ovni')}</div>
-      ${sectionsOf(sub).map((sec, i) => `
-        ${sec.title ? `<div class="sechead" style="--t:${i % 2 ? 3 : -3}deg"><h2>${sec.emoji || ''} ${sec.title}</h2>${sec.subtitle ? `<small>${sec.subtitle}</small>` : ''}</div>` : ''}
-        ${track(sec)}`).join('')}
+      ${terms.filter((s) => !s.free).map(term).join('')}
+      ${sub.final ? `<section class="term final open"><div class="grid single">${boss(null, true)}</div>
+        ${finalOpen(sub) ? '' : '<p class="lead center">🔒 Se abre al aprobar los exámenes de los tres trimestres.</p>'}</section>` : ''}
+      ${terms.filter((s) => s.free).map(term).join('')}
     </section>`);
     bindHud(() => map(sub));
-    on('.pnode[data-u]', (b) => sheet(sub, sub.units.find((u) => u.id === b.dataset.u)));
-    on('.pnode[data-exam]', (b) => startExam(sub, sectionsOf(sub).find((s) => s.key === b.dataset.exam)));
-    const meOn = $app.querySelector('.me-on');
-    if (meOn && sub.units.indexOf(here) > 2) setTimeout(() => meOn.scrollIntoView({ block: 'center', behavior: calm ? 'auto' : 'smooth' }), 450);
+    layoutGrids();
+    on('.gnode[data-u]', (b) => {
+      const u = sub.units.find((x) => x.id === b.dataset.u);
+      if (unitOpen(sub, u)) return sheet(sub, u);
+      sfx.bad();
+      const units = sub.units.filter((x) => x.section === u.section), prev = units[units.indexOf(u) - 1];
+      const msg = prev ? `🔒 Primero completa <b>${prev.planet}</b> (todas sus misiones con al menos una ⭐).` : '🔒 Este trimestre todavía está cerrado.';
+      toast(msg);
+      if (sub.young) speak(msg);
+    });
+    on('.gnode[data-exam]', (b) => {
+      const key = b.dataset.exam, isFinal = sub.final && key === sub.final.key;
+      if (isFinal) return finalOpen(sub) ? startExam(sub, null, true) : (sfx.bad(), toast('🔒 Aprueba los exámenes de los tres trimestres para abrir el examen final.'));
+      const sec = terms.find((s) => s.key === key);
+      if (examOpen(sub, sec)) return startExam(sub, sec);
+      sfx.bad();
+      toast('🔒 Completa todos los planetas del trimestre para abrir su examen.');
+    });
+    on('.termhead', (b) => {
+      const sec = terms.find((s) => s.key === b.dataset.fold);
+      if (!secOpen(sub, sec)) { sfx.bad(); return toast(b.querySelector('.tstatus').innerHTML); }
+      openSecs[sub.id] = openSecs[sub.id] || {};
+      openSecs[sub.id][sec.key] = !isOpen(sec);
+      sfx.tap();
+      const y = window.scrollY;
+      map(sub);
+      window.scrollTo(0, y);
+    });
   }
+  // zigzag rows (left→right, then right→left…) and the dotted trail between planets
+  function layoutGrids() {
+    $app.querySelectorAll('.grid:not(.single)').forEach((grid) => {
+      const nodes = [...grid.querySelectorAll('.gnode')], w = grid.clientWidth;
+      const cols = Math.max(3, Math.min(6, Math.floor(w / 128)));
+      grid.style.setProperty('--cols', cols);
+      nodes.forEach((n, i) => {
+        const row = Math.floor(i / cols), k = i % cols;
+        n.style.gridRow = row + 1;
+        n.style.gridColumn = (row % 2 ? cols - k : k + 1);
+      });
+      const svgEl = grid.querySelector('.gtrail'), g = grid.getBoundingClientRect();
+      const pts = nodes.map((n) => { const r = n.querySelector('.orb').getBoundingClientRect(); return [r.left + r.width / 2 - g.left, r.top + r.height / 2 - g.top]; });
+      svgEl.setAttribute('viewBox', `0 0 ${g.width} ${g.height}`);
+      const d = pts.map((p, i) => `${i ? 'L' : 'M'}${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join(' ');
+      svgEl.innerHTML = `<path d="${d}" class="trail-glow"/><path d="${d}" class="trail-dots"/>`;
+    });
+  }
+  let resizeTimer = 0;
+  window.addEventListener('resize', () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(() => $app.querySelector('.grid') && layoutGrids(), 120); });
 
   function sheet(sub, u) {
     const wrap = document.createElement('div');
@@ -312,9 +397,12 @@
     }));
     play({ sub, unit: u, mission: m, exam: false, queue, title: m.title, color: u.color });
   }
-  function startExam(sub, sec) {
+  // a term exam asks about that term's planets; the final exam about the whole course
+  function startExam(sub, sec, isFinal) {
+    if (isFinal) sec = { key: sub.final.key, final: true };
     sec = sec || sectionsOf(sub)[0];
-    const ex = examOf(sub, sec), units = unitsOf(sub, sec);
+    const ex = isFinal ? sub.final : examOf(sub, sec);
+    const units = isFinal ? sub.units.filter((u) => u.section !== 'arcade') : unitsOf(sub, sec);
     const all = units.flatMap((u) => u.missions.filter((m) => !m.arcade).map((m) => ({ unit: u, make: () => m.gen(1) })));
     const queue = R.shuffle(units).map((u) => R.pick(all.filter((x) => x.unit === u))).filter(Boolean).slice(0, ex.rounds);
     while (queue.length < ex.rounds) queue.push(R.pick(all));
@@ -328,6 +416,7 @@
   // Short run to the next mission's planet (runner.js); its crystals are a bonus.
   function travel(sub, from, to, then) {
     render(`<section class="travel" style="--c:${to.color}">
+      ${whoChip()}
       <h2 class="title3d">${from === to ? `Siguiente misión en ${to.planet}` : `Rumbo a ${to.planet}`} ${to.emoji}</h2>
       <div class="rhost"></div>
     </section>`);
@@ -342,11 +431,12 @@
     ses.rankBefore = rank();
     const total = arcade ? Infinity : ses.queue.length;
     const log = []; // per round: { unit, first, solved }
-    let i = 0, combo = 0, earned = 0, widget = null, ch = null, waitingNext = false, over = false, endAt = 0;
+    let i = 0, combo = 0, earned = 0, widget = null, ch = null, waitingNext = false, over = false, endAt = 0, concepts = [];
 
     render(`<section class="play${young ? ' young' : ''}${arcade ? ' arcade' : ''}" style="--c:${ses.color}">
       <header class="topbar">
         <button class="icon quit" aria-label="Salir">✕</button>
+        ${whoChip()}
         ${arcade
           ? '<div class="timer"><i></i></div><span class="pill score">✔ <b>0</b></span>'
           : `<div class="dots">${ses.queue.map(() => '<i></i>').join('')}</div>`}
@@ -448,7 +538,8 @@
       q('.feedback').hidden = true;
       q('.bubble').hidden = true;
       q('.actions').hidden = false;
-      q('.hint').hidden = ses.exam || !ch.hint;
+      concepts = S.concepts(`${ch.prompt} ${ch.hint || ''} ${ch.html || ''}`);
+      q('.hint').hidden = ses.exam || (!ch.hint && !concepts.length);
       const old = q('.widget'), fresh = old.cloneNode(false); // drop the old widget's listeners
       old.replaceWith(fresh);
       q('.check').disabled = true;
@@ -489,11 +580,16 @@
         store.save();
         const weak = [...new Set(log.filter((r) => !r.first).map((r) => r.unit))];
         const stars = examStars(nota);
+        const terms = termSecs(ses.sub), nextTerm = ses.sec.final ? null : terms[terms.indexOf(terms.find((t) => t.key === key)) + 1];
+        const unlock = nota < PASS ? `<div class="levelup warn">Necesitas un ${PASS} para aprobar${nextTerm ? ` y abrir el ${nextTerm.title}` : ''}. ¡Repasa y vuelve a intentarlo!</div>`
+          : ses.sec.final ? '<div class="levelup">🏆 ¡Has aprobado el curso entero!</div>'
+            : nextTerm ? `<div class="levelup">🔓 ¡Se abre el ${nextTerm.title}!</div>`
+              : ses.sub.final ? '<div class="levelup">🔓 ¡Ya puedes hacer el examen final de curso!</div>' : '';
         result({
           ses, earned,
           head: young ? (stars === 3 ? '¡Reto superado!' : stars === 2 ? '¡Muy bien!' : '¡Buen intento!')
             : nota >= 9 ? '¡Examen espectacular!' : nota >= 7 ? '¡Muy buen examen!' : nota >= 5 ? '¡Aprobado!' : 'Hay que entrenar un poco más',
-          big: young ? bigStars(stars) : `<div class="nota">${nota}<small>/ 10</small></div>`,
+          big: (young ? bigStars(stars) : `<div class="nota">${nota}<small>/ 10</small></div>`) + unlock,
           body: weak.length
             ? `<p>Para mejorar, repasa:</p><div class="weak">${weak.map((u) => `<button class="chip" data-u="${u.id}" style="--c:${u.color}">${u.emoji} ${u.planet}</button>`).join('')}</div>`
             : '<p>¡Ni un solo fallo! ¡Eres un crack!</p>',
@@ -516,7 +612,13 @@
 
     q('.check').addEventListener('click', () => widget.check && widget.check());
     q('.next').addEventListener('click', next);
-    q('.hint').addEventListener('click', () => say(ch.hint));
+    // the hint, plus what the key words of the question mean
+    q('.hint').addEventListener('click', () => {
+      const defs = concepts.map(([t, d]) => `<span class="concept"><b>📘 ${t}:</b> ${d}</span>`).join('');
+      q('.btext').innerHTML = `${ch.hint ? `<span class="hintline">💡 ${ch.hint}</span>` : ''}${defs}`;
+      q('.bubble').hidden = false;
+      if (young) speak(ch.hint || concepts.map(([t, d]) => `${t}: ${d}`).join('. '));
+    });
     if (young) q('.again').addEventListener('click', () => speak(ch.prompt));
     q('.quit').addEventListener('click', () => { if (confirm('¿Salir de la misión? Perderás el progreso de esta partida.')) map(ses.sub); });
     keyHandler = (e) => {
@@ -533,14 +635,19 @@
   // ---------------- results ----------------
   function result(r) {
     const { ses } = r;
-    let nextUp = null;
+    let nextUp = null, examUp = null;
     if (!ses.exam) {
       const ms = ses.unit.missions, mi = ms.indexOf(ses.mission);
-      const ui = ses.sub.units.indexOf(ses.unit);
+      const ui = ses.sub.units.indexOf(ses.unit), nu = ses.sub.units[ui + 1];
       if (mi < ms.length - 1) nextUp = { u: ses.unit, m: ms[mi + 1] };
-      else if (ui < ses.sub.units.length - 1) nextUp = { u: ses.sub.units[ui + 1], m: ses.sub.units[ui + 1].missions[0] };
+      else if (nu && nu.section === ses.unit.section && unitOpen(ses.sub, nu)) nextUp = { u: nu, m: nu.missions[0] };
+      else {
+        const sec = sectionsOf(ses.sub).find((x) => !x.id || x.id === ses.unit.section);
+        if (sec && sec.exam !== false && examOpen(ses.sub, sec) && me.exams[sec.key] === undefined) examUp = sec;
+      }
     }
     render(`<section class="result">
+      ${whoChip()}
       <div class="hero-char big">${CH(me.avatar, r.party ? 'happy' : 'idle')}</div>
       <h1>${r.head}</h1>
       ${r.big}
@@ -549,7 +656,8 @@
       <p class="pill">💎 +${r.earned} cristales</p>
       <div class="rbtns">
         ${nextUp ? `<button class="btn primary" data-act="next">Siguiente: ${nextUp.m.title} ➜</button>` : ''}
-        <button class="btn ${nextUp ? 'ghost' : 'primary'}" data-act="again">🔁 ${ses.exam ? 'Otra vez' : 'Repetir'}</button>
+        ${examUp ? `<button class="btn primary" data-act="exam">📝 ¡Al ${examOf(ses.sub, examUp).title.replace('Examen', 'examen')}! ➜</button>` : ''}
+        <button class="btn ${nextUp || examUp ? 'ghost' : 'primary'}" data-act="again">🔁 ${ses.exam ? 'Otra vez' : 'Repetir'}</button>
         <button class="btn ghost" data-act="map">🪐 Volver al mapa</button>
       </div>
     </section>`);
@@ -557,12 +665,62 @@
     if (ses.sub.young) speak(r.head);
     const goNext = () => travel(ses.sub, ses.unit, nextUp.u, () => startMission(ses.sub, nextUp.u, nextUp.m));
     on('[data-act="next"]', goNext);
+    on('[data-act="exam"]', () => startExam(ses.sub, examUp));
     keyHandler = (e) => {
       if (nextUp && (e.key === 'ArrowRight' || e.key === 'Enter')) { e.preventDefault(); goNext(); }
     };
-    on('[data-act="again"]', () => (ses.exam ? startExam(ses.sub, ses.sec) : startMission(ses.sub, ses.unit, ses.mission)));
+    on('[data-act="again"]', () => (ses.exam ? startExam(ses.sub, ses.sec.final ? null : ses.sec, !!ses.sec.final) : startMission(ses.sub, ses.unit, ses.mission)));
     on('[data-act="map"]', () => map(ses.sub));
     on('.chip[data-u]', (b) => { map(ses.sub); sheet(ses.sub, ses.sub.units.find((u) => u.id === b.dataset.u)); });
+  }
+
+  // ---------------- progress ----------------
+  // One screen with where the player is: each subject of his school year (and any
+  // other he has played), its terms with stars and exam marks, and the next step.
+  function progress() {
+    const all = Object.values(S.subjects);
+    const played = (s) => s.units.some((u) => unitStars(s, u));
+    // the player's own course first, then the rest of his school year, then anything else he played
+    const score = (s) => (s.final && forAge(s, me) ? 0 : forAge(s, me) ? 1 : 2);
+    const subs = all.filter((s) => forAge(s, me) || played(s)).sort((a, b) => score(a) - score(b));
+    const nextStep = (s) => {
+      const u = s.units.find((x) => x.section !== 'arcade' && unitOpen(s, x) && !unitDone(s, x));
+      if (u) return `Siguiente planeta: <b>${u.emoji} ${u.planet}</b>`;
+      const sec = termSecs(s).find((x) => examOpen(s, x) && !passed(x.key));
+      if (sec) return `Te toca: <b>📝 ${examOf(s, sec).title}</b>`;
+      if (s.final && finalOpen(s) && !passed(s.final.key)) return 'Te toca: <b>🏆 Examen final de curso</b>';
+      return s.final && passed(s.final.key) ? '<b>🏆 ¡Curso completado!</b>' : '';
+    };
+    const card = (s) => {
+      const units = s.units.filter((u) => u.section !== 'arcade');
+      const got = units.reduce((a, u) => a + unitStars(s, u), 0), max = units.reduce((a, u) => a + u.missions.length * 3, 0);
+      const rows = termSecs(s).map((sec) => {
+        const us = unitsOf(s, sec), open = secOpen(s, sec);
+        const g = us.reduce((a, u) => a + unitStars(s, u), 0), m = us.reduce((a, u) => a + u.missions.length * 3, 0);
+        return `<div class="prow${open ? '' : ' locked'}">
+          <div class="phead"><b>${sec.emoji || '🪐'} ${sec.title || 'Planetas'}</b><span>${!open ? '🔒 Cerrado' : sec.exam === false ? '' : `Examen: ${examText(s, sec.key)}`}</span></div>
+          <span class="tbar"><i style="width:${m ? (g / m) * 100 : 0}%"></i></span>
+          <div class="pchips">${us.map((u) => `<span class="pchip${unitOpen(s, u) ? (unitDone(s, u) ? ' done' : '') : ' locked'}" title="${u.planet}">${unitOpen(s, u) ? u.emoji : '🔒'}<i>${unitStars(s, u)}/${u.missions.length * 3}</i></span>`).join('')}</div>
+        </div>`;
+      }).join('');
+      return `<article class="pcardp">
+        <div class="ptop"><span class="semoji">${s.emoji}</span><div><h2>${s.title}</h2><small>⭐ ${got} / ${max} · ${max ? Math.round((got / max) * 100) : 0} %</small></div>
+          <button class="btn primary small" data-sub="${s.id}">Ir al mapa ➜</button></div>
+        <span class="tbar big"><i style="width:${max ? (got / max) * 100 : 0}%"></i></span>
+        <p class="next">${nextStep(s)}</p>
+        ${rows}
+        ${s.final ? `<div class="prow final${finalOpen(s) ? '' : ' locked'}"><div class="phead"><b>🏆 Examen final de curso</b><span>${finalOpen(s) ? examText(s, s.final.key) : '🔒 Aprueba los tres trimestres'}</span></div></div>` : ''}
+      </article>`;
+    };
+    render(`${hud()}<section class="progress">
+      <div class="greet"><div class="hero-char">${CH(me.avatar, 'happy')}</div>
+        <div class="greet-talk"><h1 class="title3d">Tu progreso</h1><p>${esc(me.name)} · ${cursoName(me.curso) || ''} · ${rank()} · ⭐ ${totalStars()} · 💎 ${fmt(me.crystals)}</p></div></div>
+      ${subs.map(card).join('') || '<p class="lead">Todavía no has jugado. ¡Elige una galaxia y empieza!</p>'}
+      <button class="btn ghost" data-nav="home">🏠 Volver al inicio</button>
+    </section>`);
+    bindHud(progress);
+    on('.progress > [data-nav="home"]', home);
+    on('.pcardp [data-sub]', (b) => map(S.subjects[b.dataset.sub]));
   }
 
   fx.starfield();
