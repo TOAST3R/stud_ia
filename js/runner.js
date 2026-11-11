@@ -7,7 +7,7 @@
 
   S.runner = function (host, o) {
     const young = !!o.young, SPEED = young ? 190 : 260, END = SPEED * (o.seconds || 14), PX = 90;
-    const GRAVITY = 2400, JUMP = [840, 720];
+    const GRAVITY = 2400, JUMP = [840, 720], hero = S.charImage(o.avatar);
     host.innerHTML = `<div class="runner">
       <canvas aria-label="Minijuego: salta los obstáculos y recoge cristales"></canvas>
       <div class="rtop"><span class="pill">💎 <b>0</b></span><button type="button" class="btn ghost rskip">Saltar ⏭</button></div>
@@ -117,7 +117,8 @@
       const bob = py === 0 && !over ? Math.abs(Math.sin(t * 12)) * 4 : 0;
       if (py > 0) emoji('🔥', PX - 6, g - py + 20, 22);
       c.globalAlpha = inv > 0 && Math.floor(t * 12) % 2 ? 0.35 : 1;
-      emoji(o.avatar, PX, g - py - bob + 2, 46);
+      if (hero.complete && hero.naturalWidth) c.drawImage(hero, PX - 30, g - py - bob - 58, 60, 60);
+      else emoji('🧑‍🚀', PX, g - py - bob + 2, 46);
       c.globalAlpha = 1;
     }
     function frame(now) {
@@ -156,7 +157,7 @@
     }
     function onKey(e) {
       if ([' ', 'ArrowUp', 'w', 'W'].includes(e.key)) { e.preventDefault(); over ? close() : jump(); }
-      else if (e.key === 'Enter' && over) close();
+      else if ((e.key === 'Enter' || e.key === 'ArrowLeft') && over) { e.preventDefault(); close(); }
     }
     canvas.addEventListener('pointerdown', (e) => { e.preventDefault(); jump(); });
     root.querySelector('.rskip').addEventListener('click', close);
