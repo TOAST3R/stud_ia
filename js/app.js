@@ -252,8 +252,21 @@
 
   // Arcade missions ({ arcade: { seconds, goals: [⭐, ⭐⭐, ⭐⭐⭐] } }) ask questions
   // non-stop until the time runs out; stars depend on how many were right.
+  // Short run to the next mission's planet (runner.js); its crystals are a bonus.
+  function travel(sub, from, to, then) {
+    render(`<section class="travel" style="--c:${to.color}">
+      <h2>${from === to ? `Siguiente misión en ${to.planet}` : `Rumbo a ${to.planet}`} ${to.emoji}</h2>
+      <div class="rhost"></div>
+    </section>`);
+    S.runner($app.querySelector('.rhost'), {
+      avatar: me.avatar, target: to, young: !!sub.young, seconds: sub.young ? 12 : 14,
+      onEnd: (gems) => { me.crystals += gems; store.save(); then(); },
+    });
+  }
+
   function play(ses) {
     const arcade = ses.arcade, young = !!ses.sub.young;
+    ses.rankBefore = rank();
     const total = arcade ? Infinity : ses.queue.length;
     const log = []; // per round: { unit, first, solved }
     let i = 0, combo = 0, earned = 0, widget = null, ch = null, waitingNext = false, over = false, endAt = 0;
@@ -452,6 +465,7 @@
       <div class="ava big">${me.avatar}</div>
       <h1>${r.head}</h1>
       ${r.big}
+      ${rank() !== ses.rankBefore ? `<div class="levelup">🎖️ ¡Has subido de rango! Ahora eres <b>${rank()}</b></div>` : ''}
       <div class="rbody">${r.body}</div>
       <p class="pill">💎 +${r.earned} cristales</p>
       <div class="rbtns">
@@ -462,7 +476,7 @@
     </section>`);
     if (r.party) { sfx.win(); fx.confetti(60); }
     if (ses.sub.young) speak(r.head);
-    on('[data-act="next"]', () => startMission(ses.sub, nextUp.u, nextUp.m));
+    on('[data-act="next"]', () => travel(ses.sub, ses.unit, nextUp.u, () => startMission(ses.sub, nextUp.u, nextUp.m)));
     on('[data-act="again"]', () => (ses.exam ? startExam(ses.sub, ses.sec) : startMission(ses.sub, ses.unit, ses.mission)));
     on('[data-act="map"]', () => map(ses.sub));
     on('.chip[data-u]', (b) => { map(ses.sub); sheet(ses.sub, ses.sub.units.find((u) => u.id === b.dataset.u)); });
