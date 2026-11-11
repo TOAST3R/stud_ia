@@ -39,21 +39,22 @@
   const KEY = 'studia.v2', OLD_KEY = 'studia.v1';
   const newPlayer = (o) => Object.assign({
     id: 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
-    name: '', age: 9, avatar: '🚀', crystals: 0, stars: {}, exams: {},
+    name: '', age: null, avatar: '🚀', crystals: 0, stars: {}, exams: {},
   }, o);
   const data = { players: [], current: null, sound: true };
   try {
     const saved = localStorage.getItem(KEY);
-    if (saved) Object.assign(data, JSON.parse(saved));
-    else {
-      // first version had a single player: keep his progress
-      const old = JSON.parse(localStorage.getItem(OLD_KEY) || 'null');
-      if (old && old.name) {
-        const p = newPlayer({ name: old.name, avatar: old.avatar || '🚀', crystals: old.crystals || 0, stars: old.stars || {}, exams: old.exams || {} });
-        data.players.push(p);
-        data.current = p.id;
-        data.sound = old.sound !== false;
-      }
+    const old = JSON.parse(localStorage.getItem(OLD_KEY) || 'null');
+    if (saved) {
+      Object.assign(data, JSON.parse(saved));
+      // a build of this version gave the migrated player age 9 without asking: ask him now
+      if (old && old.name) data.players.forEach((p) => { if (!p.asked && p.name === old.name) p.age = null; });
+    } else if (old && old.name) {
+      // the first version had a single player: keep his progress, then ask his age
+      const p = newPlayer({ name: old.name, avatar: old.avatar || '🚀', crystals: old.crystals || 0, stars: old.stars || {}, exams: old.exams || {} });
+      data.players.push(p);
+      data.current = p.id;
+      data.sound = old.sound !== false;
     }
   } catch (e) { /* private mode or corrupted data: start fresh */ }
   S.store = {

@@ -47,6 +47,8 @@
   function start() {
     me = store.player;
     if (!data.players.length) return editPlayer(null);
+    const unfinished = data.players.find((p) => !p.age);
+    if (unfinished) return editPlayer(unfinished);
     if (data.players.length === 1) {
       me = data.players[0];
       data.current = me.id;
@@ -62,7 +64,7 @@
       <h1>¿Quién juega?</h1>
       <div class="players">
         ${data.players.map((p) => `<div class="pcard">
-          <button class="pplay" data-id="${p.id}"><span class="ava big">${p.avatar}</span><b>${esc(p.name)}</b><small>${p.age} años · ⭐ ${totalStars(p)}</small></button>
+          <button class="pplay" data-id="${p.id}"><span class="ava big">${p.avatar}</span><b>${esc(p.name)}</b><small>${p.age ? `${p.age} años · ` : ''}⭐ ${totalStars(p)}</small></button>
           <button class="icon pedit" data-id="${p.id}" aria-label="Editar a ${esc(p.name)}">✏️</button>
         </div>`).join('')}
         <button class="pcard pnew"><span class="ava big">➕</span><b>Nuevo jugador</b><small>Para otro hermano</small></button>
@@ -74,28 +76,32 @@
       data.current = me.id;
       store.save();
       sfx.ok();
-      home();
+      me.age ? home() : editPlayer(me);
     });
     on('.pedit', (b) => editPlayer(byId(b.dataset.id)));
     on('.pnew', () => editPlayer(null));
   }
 
+  // Same form for the first player, a new one, or one carried over from the
+  // first version (setup: his progress is kept, only name/age/avatar are asked).
   function editPlayer(p) {
-    const isNew = !p, first = !data.players.length;
+    const isNew = !p, setup = !!p && !p.age, first = !data.players.length || setup;
     let age = p ? p.age : null, avatar = p ? p.avatar : '🚀';
     const unlocked = AVATARS.filter((a) => a.need <= (p ? totalStars(p) : 0));
     render(`<section class="welcome">
       ${first ? '' : '<button class="icon back" aria-label="Volver">←</button>'}
       <div class="logo">🚀</div>
       <h1>${first ? 'StudIA' : isNew ? 'Nuevo jugador' : 'Editar jugador'}</h1>
-      ${first ? '<p class="lead">Una aventura espacial para aprender y preparar exámenes.</p>' : ''}
+      ${!first ? '' : setup
+        ? '<p class="lead">¡Nueva versión! Ahora pueden jugar varios hermanos. Tu progreso se guarda: solo confirma tus datos.</p>'
+        : '<p class="lead">Una aventura espacial para aprender y preparar exámenes.</p>'}
       <label>¿Cómo te llamas?<input id="name" maxlength="14" autocomplete="off" placeholder="Tu nombre" value="${esc(p ? p.name : '')}"></label>
       <p class="q">¿Cuántos años tienes?</p>
       <div class="ages">${[3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((a) => `<button class="age${a === age ? ' sel' : ''}" data-a="${a}">${a}</button>`).join('')}</div>
       <p class="q">Elige tu personaje</p>
       <div class="avatars">${unlocked.map((a) => `<button class="avatar${a.e === avatar ? ' sel' : ''}" data-e="${a.e}">${a.e}</button>`).join('')}</div>
-      <button class="btn primary big" id="go">${isNew ? '¡Despegar!' : 'Guardar'}</button>
-      ${isNew ? '' : '<button class="btn ghost del">🗑️ Borrar jugador</button>'}
+      <button class="btn primary big" id="go">${isNew || setup ? '¡Despegar!' : 'Guardar'}</button>
+      ${isNew || setup ? '' : '<button class="btn ghost del">🗑️ Borrar jugador</button>'}
     </section>`);
     on('.age', (b) => {
       age = +b.dataset.a;
@@ -124,9 +130,9 @@
       }
       const name = document.getElementById('name').value.trim() || `Jugador ${data.players.length + (isNew ? 1 : 0)}`;
       if (isNew) {
-        p = store.newPlayer({ name, age, avatar });
+        p = store.newPlayer({ name, age, avatar, asked: true });
         data.players.push(p);
-      } else Object.assign(p, { name, age, avatar });
+      } else Object.assign(p, { name, age, avatar, asked: true });
       me = p;
       data.current = p.id;
       store.save();
