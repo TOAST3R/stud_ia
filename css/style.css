@@ -576,3 +576,19 @@ button.subject:active { transform: perspective(700px) translateY(6px); box-shado
 .sheet h2 { font-family: var(--display); }
 .mission { box-shadow: 0 5px 0 #140a3a; }
 .travel h2.title3d { font-size: clamp(22px, 6vw, 32px); margin-bottom: 18px; }
+
+/* ---------- school year, 1.º–6.º extras ---------- */
+.ages.cursos { max-width: 520px; }
+.age.curso { width: auto; min-width: 64px; padding: 0 12px; font-size: 17px; }
+.askcurso { margin: 4px 0 18px; padding: 14px 16px 16px; border-radius: 22px; background: #fff; color: var(--ink); box-shadow: 0 7px 0 #c9bfff; text-align: center; }
+.askcurso .ages { margin-top: 10px; }
+.askcurso .age { background: #ece6ff; color: var(--ink); }
+.blocks { display: flex; align-items: flex-end; justify-content: center; flex-wrap: wrap; gap: 6px; max-width: 420px; margin: 0 auto; }
+.blocks .ten { width: 16px; height: 120px; border: 2px solid var(--ink); border-radius: 4px; background: repeating-linear-gradient(#58c4ff 0 10px, #24164f 10px 12px); }
+.blocks .unit { width: 16px; height: 12px; border: 2px solid var(--ink); border-radius: 3px; background: var(--yellow); }
+.purse { display: inline-flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 6px; max-width: 100%; }
+.purse .coin { width: 54px; }
+.purse .note { width: 96px; }
+.qbox { display: inline-grid; place-items: center; width: 1.3em; height: 1.3em; border: 3px dashed #cdb98a; border-radius: 12px; background: #fff; color: #9a8556; }
+.groups { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
+.groups .grp { padding: 6px 8px; border-radius: 14px; background: #f1e5c7; font-size: 24px; letter-spacing: 2px; max-width: none; }

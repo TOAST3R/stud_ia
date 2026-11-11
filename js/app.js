@@ -21,7 +21,12 @@
   const totalStars = (p) => Object.values((p || me).stars).reduce((a, b) => a + b, 0);
   const rank = () => RANKS.filter((r) => totalStars() >= r[0]).pop()[1];
   const starIcons = (n) => `<span class="st">${'★'.repeat(n)}<i>${'★'.repeat(3 - n)}</i></span>`;
-  const forAge = (s, p) => !s.ages || (p.age >= s.ages[0] && p.age <= s.ages[1]);
+  // A player's school year (curso) decides which subjects come first; without
+  // one we guess from the age.
+  const CURSOS = [['i3', 'Infantil 3'], ['i4', 'Infantil 4'], ['i5', 'Infantil 5'], ['1', '1.º'], ['2', '2.º'], ['3', '3.º'], ['4', '4.º'], ['5', '5.º'], ['6', '6.º']];
+  const cursoName = (c) => (CURSOS.find((x) => x[0] === c) || [])[1];
+  const forAge = (s, p) => (p.curso && s.grades ? s.grades.includes(p.curso) : !s.ages || (p.age >= s.ages[0] && p.age <= s.ages[1]));
+  const cursoChips = (sel) => `<div class="ages cursos">${CURSOS.map(([id, name]) => `<button class="age curso${id === sel ? ' sel' : ''}" data-c="${id}">${name}</button>`).join('')}</div>`;
 
   let keyHandler = null, tick = null;
   document.addEventListener('keydown', (e) => { if (keyHandler) keyHandler(e); });
@@ -87,7 +92,7 @@
       <h1 class="title3d">¿Quién juega?</h1>
       <div class="players">
         ${data.players.map((p) => `<div class="pcard" data-tilt>
-          <button class="pplay" data-id="${p.id}"><span class="podium">${CH(p.avatar)}</span><b>${esc(p.name)}</b><small>${p.age ? `${p.age} años · ` : 'falta tu edad · '}⭐ ${totalStars(p)}</small></button>
+          <button class="pplay" data-id="${p.id}"><span class="podium">${CH(p.avatar)}</span><b>${esc(p.name)}</b><small>${p.age ? `${p.curso ? cursoName(p.curso) : `${p.age} años`} · ` : 'falta tu edad · '}⭐ ${totalStars(p)}</small></button>
           <button class="icon pedit" data-id="${p.id}" aria-label="Editar a ${esc(p.name)}">✏️</button>
         </div>`).join('')}
         <button class="pcard pnew" data-tilt><span class="podium empty">+</span><b>Nuevo jugador</b><small>Para otro hermano</small></button>
@@ -109,7 +114,7 @@
   // first version (setup: his progress is kept, only name/age/avatar are asked).
   function editPlayer(p) {
     const isNew = !p, setup = !!p && !p.age, first = !data.players.length || (setup && data.players.length === 1);
-    let age = p ? p.age : null, avatar = p ? S.charId(p.avatar) : 'astro';
+    let age = p ? p.age : null, avatar = p ? S.charId(p.avatar) : 'astro', curso = p ? p.curso || null : null;
     const unlocked = S.CHARS.filter((a) => a.need <= (p ? totalStars(p) : 0));
     render(`<section class="welcome">
       ${first ? '' : '<button class="icon back" aria-label="Volver">←</button>'}
@@ -120,15 +125,21 @@
       <label>¿Cómo te llamas?<input id="name" maxlength="14" autocomplete="off" placeholder="Tu nombre" value="${esc(p ? p.name : '')}"></label>
       <p class="q">¿Cuántos años tienes?</p>
       <div class="ages">${[3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((a) => `<button class="age${a === age ? ' sel' : ''}" data-a="${a}">${a}</button>`).join('')}</div>
+      <p class="q">¿En qué curso estás?</p>
+      ${cursoChips(curso)}
       <p class="q">Elige tu personaje</p>
       <div class="avatars">${unlocked.map((a) => `<button class="avatar${a.id === avatar ? ' sel' : ''}" data-e="${a.id}">${CH(a.id)}<small>${a.name}</small></button>`).join('')}</div>
       <button class="btn primary big" id="go">${isNew || setup ? '¡Despegar!' : 'Guardar'}</button>
       ${isNew || setup ? '' : '<button class="btn ghost del">🗑️ Borrar jugador</button>'}
     </section>`);
-    on('.age', (b) => {
+    on('.curso', (b) => {
+      curso = b.dataset.c;
+      $app.querySelectorAll('.curso').forEach((x) => x.classList.toggle('sel', x === b));
+    });
+    on('.age:not(.curso)', (b) => {
       age = +b.dataset.a;
       $app.querySelector('.ages').classList.remove('need');
-      $app.querySelectorAll('.age').forEach((x) => x.classList.toggle('sel', x === b));
+      $app.querySelectorAll('.age:not(.curso)').forEach((x) => x.classList.toggle('sel', x === b));
     });
     on('.avatar', (b) => {
       avatar = b.dataset.e;
@@ -154,9 +165,9 @@
       }
       const name = document.getElementById('name').value.trim() || `Jugador ${data.players.length + (isNew ? 1 : 0)}`;
       if (isNew) {
-        p = store.newPlayer({ name, age, avatar, asked: true });
+        p = store.newPlayer({ name, age, avatar, curso, asked: true });
         data.players.push(p);
-      } else Object.assign(p, { name, age, avatar, asked: true });
+      } else Object.assign(p, { name, age, avatar, curso, asked: true });
       me = p;
       data.current = p.id;
       store.save();
@@ -182,6 +193,7 @@
     const stars = totalStars();
     const next = S.CHARS.find((a) => a.need > stars);
     render(`${hud()}<section class="home">
+      ${me.curso ? '' : `<div class="askcurso"><b>¿En qué curso estás?</b> Así te enseño primero tus mates.${cursoChips(null)}</div>`}
       <div class="greet">
         <div class="hero-char">${CH(me.avatar, 'happy')}</div>
         <div class="greet-talk"><h1 class="title3d">¡Hola, ${esc(me.name)}!</h1><p>¿Qué galaxia exploramos hoy?</p></div>
@@ -199,6 +211,7 @@
     bindHud(home);
     on('.subject[data-sub]', (b) => map(S.subjects[b.dataset.sub]));
     on('button.avatar', (b) => { me.avatar = b.dataset.e; store.save(); home(); });
+    on('.askcurso .curso', (b) => { me.curso = b.dataset.c; store.save(); sfx.ok(); home(); });
     if (me.age < 7) speak(`¡Hola, ${me.name}! Elige un juego.`);
   }
 

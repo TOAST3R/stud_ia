@@ -1045,4 +1045,19 @@
     { id: 'arcade', key: 'mates5.arcade', emoji: '🕹️', title: 'Arcade', subtitle: 'Contra el reloj. ¡Bate tu récord!', exam: false },
   ];
   sub.tagline = 'Cuadernillo 1, todo el curso y arcade';
+
+  // Shared with the other school years (primaria.js): drawing helpers and the
+  // generators, which other courses use at a fixed or capped level.
+  S.kit = {
+    one, choose, frac, cell, sum, range, r3, gcd, isSquare, words, roman, randDigits, PLACES,
+    svg, fracPic, clock, angleFig, triangleFig, polygonFig, rectFig, barChart,
+    g: {
+      gJumps, gDecompAdd, gDerived, gPlace, gOrderBig, gRound, gCardsBig, gPack, gFactTriangle, gWeb, gDivDecomp, gShare, gRestFromQ, gCalc,
+      gFracRead, gFracOf, gFracCompare, gFracEquiv, gFracAdd, gMixed,
+      gDecPlace, gDecFrac, gDecCompare, gDecOps, gDecTimes, gPercent,
+      gMultiplesBoard, gDivisorsBoard, gPrimes, gCriteria, gPow, gRoman, gReadNumber, gCombined,
+      gAngle, gTriangle, gPolygon, gCircle, gConvert, gArea, gClock, gTimeConv, gTimeAdd, gChart, gMean, gProb,
+      gBattle, gMental, gDivFast, gSqFast,
+    },
+  };
 })();
