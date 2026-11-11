@@ -35,18 +35,66 @@
     return goal.kind === 'max' ? v : goal.kind === 'min' ? -v : -Math.abs(v - goal.target);
   };
 
-  // ---- saved progress ----
-  const KEY = 'studia.v1';
-  const defaults = () => ({ name: '', avatar: '🚀', crystals: 0, stars: {}, exams: {}, sound: true });
-  let data = defaults();
+  // ---- saved progress: several players on the same device ----
+  const KEY = 'studia.v2', OLD_KEY = 'studia.v1';
+  const newPlayer = (o) => Object.assign({
+    id: 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+    name: '', age: 9, avatar: '🚀', crystals: 0, stars: {}, exams: {},
+  }, o);
+  const data = { players: [], current: null, sound: true };
   try {
-    data = Object.assign(defaults(), JSON.parse(localStorage.getItem(KEY) || '{}'));
+    const saved = localStorage.getItem(KEY);
+    if (saved) Object.assign(data, JSON.parse(saved));
+    else {
+      // first version had a single player: keep his progress
+      const old = JSON.parse(localStorage.getItem(OLD_KEY) || 'null');
+      if (old && old.name) {
+        const p = newPlayer({ name: old.name, avatar: old.avatar || '🚀', crystals: old.crystals || 0, stars: old.stars || {}, exams: old.exams || {} });
+        data.players.push(p);
+        data.current = p.id;
+        data.sound = old.sound !== false;
+      }
+    }
   } catch (e) { /* private mode or corrupted data: start fresh */ }
   S.store = {
     data,
+    newPlayer,
+    get player() { return data.players.find((p) => p.id === data.current) || null; },
     save() {
       try { localStorage.setItem(KEY, JSON.stringify(data)); } catch (e) { /* ignore */ }
     },
+  };
+
+  // ---- voice: reads questions aloud for children who can't read yet ----
+  let voice = null;
+  function pickVoice() {
+    const vs = window.speechSynthesis ? speechSynthesis.getVoices() : [];
+    voice = vs.find((v) => v.lang === 'es-ES' && /m[oó]nica|google/i.test(v.name))
+      || vs.find((v) => v.lang === 'es-ES') || vs.find((v) => /^es/.test(v.lang)) || null;
+  }
+  if (window.speechSynthesis) {
+    pickVoice();
+    speechSynthesis.addEventListener('voiceschanged', pickVoice);
+  }
+  S.plain = (html) => {
+    const d = document.createElement('div');
+    d.innerHTML = html;
+    return d.textContent
+      .replace(/[\p{Extended_Pictographic}\u{1F3FB}-\u{1F3FF}‍️⃣]/gu, '')
+      .replace(/×/g, ' por ').replace(/−/g, ' menos ')
+      .replace(/\s+/g, ' ').trim();
+  };
+  S.speak = (html) => {
+    if (!data.sound || !window.speechSynthesis) return;
+    const text = S.plain(html);
+    speechSynthesis.cancel();
+    if (!text) return;
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = 'es-ES';
+    if (voice) u.voice = voice;
+    u.rate = 0.92;
+    u.pitch = 1.1;
+    speechSynthesis.speak(u);
   };
 
   // ---- sounds (generated, no audio files) ----

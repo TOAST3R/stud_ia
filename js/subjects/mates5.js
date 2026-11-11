@@ -1,13 +1,15 @@
 // Subject: Matemáticas 5º de primaria (workbook units 3–10).
 //
 // HOW TO ADD CONTENT
-//   A subject is { id, title, emoji, tagline, units: [...] } registered in StudIA.subjects.
+//   A subject is { id, title, emoji, tagline, ages: [min, max], units: [...] } registered in
+//   StudIA.subjects. Optional: young: true (big pictures + questions read aloud) and
+//   exam: { title, label, emoji, rounds }. Players see the subjects for their age first.
 //   A unit is a planet: { id, n, title, planet, emoji, color, missions: [...] }.
 //   A mission is { id, title, desc, rounds, gen(lvl, i) } where gen returns one challenge:
 //     lvl goes 0 → 2 (easy → hard) through the mission, i is the round number
 //     (undefined in the exam).
 //   A challenge is { type, prompt, hint?, explain?, ...data } with type one of the
-//   widgets in widgets.js: 'cells', 'choice', 'paint', 'cards'.
+//   widgets in widgets.js: 'cells', 'choice', 'paint', 'cards', 'pick', 'order', 'latin', 'memory'.
 //   To add another subject, copy this file, change the id, and add a <script> in index.html.
 (function () {
   const S = window.StudIA, { R, fmt } = S;
@@ -524,6 +526,7 @@
     title: 'Mates 5.º',
     emoji: '🧮',
     tagline: 'Sumas, restas y multiplicaciones',
+    ages: [8, 12],
     units: [
       { id: 'u3', n: 3, title: 'Sumamos', planet: 'Planeta Baraja', emoji: '🃏', color: '#ff9d3d', missions: [
         { id: 'formar', title: 'Todas las combinaciones', desc: 'Forma los 6 números con 3 tarjetas y súmalos', rounds: 3, gen: g3Formar },
