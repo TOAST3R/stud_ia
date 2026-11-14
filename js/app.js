@@ -8,12 +8,12 @@
 
   const CH = S.char; // drawn characters (characters.js)
   const RANKS = [[0, 'Cadete'], [10, 'Piloto'], [25, 'Capitán'], [40, 'Comandante'], [55, 'Leyenda galáctica']];
-  const DEFAULT_EXAM = { title: 'Agujero Negro: el Examen', label: 'Simulacro', emoji: '🕳️', rounds: 10 };
+  const TH = S.themeOf; // visual world of a subject (core.js)
   // A subject may split its units in sections (u.section), each with its own exam.
   // Without sections it is one section whose exam result is saved under the subject id.
   const sectionsOf = (sub) => sub.sections || [{ id: null, key: sub.id }];
   const unitsOf = (sub, sec) => (sec.id ? sub.units.filter((u) => u.section === sec.id) : sub.units);
-  const examOf = (sub, sec) => Object.assign({}, DEFAULT_EXAM, sub.exam, sec && sec.exam);
+  const examOf = (sub, sec) => Object.assign({}, TH(sub).exam, sub.exam, sec && sec.exam);
   const unitLabel = (sub, u) => (sub.young || !u.n ? u.title : `Unidad ${u.n} · ${u.title}`);
   const examStars = (nota) => (nota >= 9 ? 3 : nota >= 6 ? 2 : 1);
   // "young" mode (voice, big pictures) can be set per unit or section; Lógica and
@@ -79,7 +79,9 @@
   let keyHandler = null, tick = null;
   document.addEventListener('keydown', (e) => { if (keyHandler) keyHandler(e); });
   const calm = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  function render(html) {
+  // sub: the subject on screen (its theme sets the backdrop); none → space
+  function render(html, sub) {
+    document.body.dataset.theme = TH(sub).id;
     keyHandler = null;
     clearInterval(tick);
     if (window.speechSynthesis) speechSynthesis.cancel();
@@ -268,17 +270,7 @@
   // whole term fits on one screen. Only the current term is open; the others fold
   // (tap to open). Planets have faces: sleepy before you start, smiling while you
   // play, sunglasses when finished. Locked planets show a padlock.
-  function planetFace(state) {
-    const O = '#24164f';
-    if (state === 'done') {
-      return `<svg viewBox="0 0 100 60" class="face" aria-hidden="true"><path d="M14 18 H86 L82 32 Q70 40 58 32 L54 24 H46 L42 32 Q30 40 18 32 Z" fill="${O}"/><path d="M22 22 L30 22" stroke="#fff" stroke-width="3" stroke-linecap="round" opacity=".7"/><path d="M30 44 Q50 60 70 44" fill="#fff" stroke="${O}" stroke-width="4" stroke-linejoin="round"/></svg>`;
-    }
-    if (state === 'sleep' || state === 'locked') {
-      return `<svg viewBox="0 0 100 60" class="face" aria-hidden="true"><path d="M22 26 Q31 34 40 26 M60 26 Q69 34 78 26" fill="none" stroke="${O}" stroke-width="4.5" stroke-linecap="round"/><ellipse cx="50" cy="46" rx="5" ry="4" fill="${O}"/>${state === 'sleep' ? '<text x="84" y="14" class="zz">z</text><text x="92" y="4" class="zz small">z</text>' : ''}</svg>`;
-    }
-    return `<svg viewBox="0 0 100 60" class="face" aria-hidden="true"><g class="eyes"><circle cx="31" cy="26" r="9" fill="#fff" stroke="${O}" stroke-width="3.5"/><circle cx="34" cy="27" r="5" fill="${O}"/><circle cx="69" cy="26" r="9" fill="#fff" stroke="${O}" stroke-width="3.5"/><circle cx="72" cy="27" r="5" fill="${O}"/></g><path d="M36 42 Q50 54 64 42" fill="none" stroke="${O}" stroke-width="4.5" stroke-linecap="round"/></svg>`;
-  }
-  const BOSS_FACE = '<svg viewBox="0 0 100 60" class="face" aria-hidden="true"><path d="M20 18 L42 26 M80 18 L58 26" stroke="#ffd23f" stroke-width="5" stroke-linecap="round"/><circle cx="34" cy="32" r="7" fill="#ffd23f"/><circle cx="66" cy="32" r="7" fill="#ffd23f"/><path d="M34 48 Q50 40 66 48" fill="none" stroke="#ffd23f" stroke-width="4.5" stroke-linecap="round"/></svg>';
+  // The subject's theme (core.js) draws the orbs: planets, islands…
   const examText = (sub, key) => {
     const best = me.exams[key];
     if (best === undefined) return 'Sin hacer';
@@ -286,7 +278,7 @@
   };
   let openSecs = {}; // which terms the player unfolded, per subject
   function map(sub) {
-    const terms = sectionsOf(sub);
+    const terms = sectionsOf(sub), th = TH(sub);
     // the level of the player's school year comes first; otherwise the first open term not passed
     const current = terms.find((s) => s.level !== undefined && s.level === myLevel())
       || terms.find((s) => !s.free && secOpen(sub, s) && !passed(s.key)) || terms[0];
@@ -298,7 +290,7 @@
       const state = !open ? 'locked' : got === max ? 'done' : got ? 'play' : 'sleep';
       const st = Math.round((got / max) * 3);
       return `<button class="gnode ${state}${u === here ? ' here' : ''}" data-u="${u.id}" style="--c:${u.color}" ${open ? '' : 'aria-disabled="true"'}>
-        <span class="orb">${planetFace(state)}<span class="badge">${open ? u.emoji : '🔒'}</span>${u === here ? `<span class="me-on">${CH(me.avatar, 'happy')}</span>` : ''}</span>
+        <span class="orb">${th.node(state)}<span class="badge">${open ? u.emoji : '🔒'}</span>${u === here ? `<span class="me-on">${CH(me.avatar, 'happy')}</span>` : ''}</span>
         <span class="tag"><b>${u.planet}</b><small>${unitLabel(sub, u)}</small><span class="pst">${'★'.repeat(st)}<i>${'★'.repeat(3 - st)}</i></span></span>
       </button>`;
     };
@@ -306,8 +298,8 @@
       const ex = isFinal ? sub.final : examOf(sub, sec), key = isFinal ? sub.final.key : sec.key;
       const open = isFinal ? finalOpen(sub) : examOpen(sub, sec);
       return `<button class="gnode boss${isFinal ? ' final' : ''}${open ? '' : ' locked'}" data-exam="${key}" ${open ? '' : 'aria-disabled="true"'}>
-        <span class="orb"><span class="swirl"></span>${isFinal ? '<span class="trophy">🏆</span>' : BOSS_FACE}<span class="badge">${open ? (isFinal ? '🏆' : '📝') : '🔒'}</span></span>
-        <span class="tag boss-tag"><b>${ex.title}</b><small>${ex.rounds} preguntas</small><span class="pst">${open ? examText(sub, key) : '🔒 Completa los planetas'}</span></span>
+        <span class="orb">${th.boss(isFinal)}<span class="badge">${open ? (isFinal ? '🏆' : '📝') : '🔒'}</span></span>
+        <span class="tag boss-tag"><b>${ex.title}</b><small>${ex.rounds} preguntas</small><span class="pst">${open ? examText(sub, key) : `🔒 Completa ${th.words.all}`}</span></span>
       </button>`;
     };
     const term = (sec) => {
@@ -327,12 +319,12 @@
     };
     render(`${hud()}<section class="map">
       <h1 class="title3d">${sub.emoji} ${sub.title}</h1>
-      <div class="ufo" aria-hidden="true">${CH('ovni')}</div>
+      ${th.deco(CH)}
       ${terms.filter((s) => !s.free).map(term).join('')}
       ${sub.final ? `<section class="term final open"><div class="grid single">${boss(null, true)}</div>
         ${finalOpen(sub) ? '' : '<p class="lead center">🔒 Se abre al aprobar los exámenes de los tres trimestres.</p>'}</section>` : ''}
       ${terms.filter((s) => s.free).map(term).join('')}
-    </section>`);
+    </section>`, sub);
     bindHud(() => map(sub));
     layoutGrids();
     on('.gnode[data-u]', (b) => {
@@ -350,7 +342,7 @@
       const sec = terms.find((s) => s.key === key);
       if (examOpen(sub, sec)) return startExam(sub, sec);
       sfx.bad();
-      toast('🔒 Completa todos los planetas del trimestre para abrir su examen.');
+      toast(`🔒 Completa ${th.words.every} del trimestre para abrir su examen.`);
     });
     on('.termhead', (b) => {
       const sec = terms.find((s) => s.key === b.dataset.fold);
@@ -435,9 +427,9 @@
       ${whoChip()}
       <h2 class="title3d">${from === to ? `Siguiente misión en ${to.planet}` : `Rumbo a ${to.planet}`} ${to.emoji}</h2>
       <div class="rhost"></div>
-    </section>`);
+    </section>`, sub);
     S.runner($app.querySelector('.rhost'), {
-      avatar: me.avatar, target: to, young: youngU(sub, to), seconds: youngU(sub, to) ? 12 : 14,
+      avatar: me.avatar, target: to, mode: TH(sub).runner, young: youngU(sub, to), seconds: youngU(sub, to) ? 12 : 14,
       onEnd: (gems) => { me.crystals += gems; store.save(); then(); },
     });
   }
@@ -475,13 +467,34 @@
         <div class="ftext"><b class="fhead"></b><span class="fbody"></span></div>
         <button class="btn primary next">Siguiente ➜</button>
       </div>
-    </section>`);
+    </section>`, ses.sub);
     const q = (s) => $app.querySelector(s);
     const dots = [...$app.querySelectorAll('.dots i')];
     const say = (msg) => {
       q('.btext').innerHTML = msg;
       q('.bubble').hidden = false;
       if (young) speak(msg);
+    };
+    // English audio of a question (Inglés): ch.listen ('sheep' or ['cat', …]); with
+    // ch.sayOptions each choice's word (o.say) follows, lighting up its button.
+    const enParts = () => {
+      if (!ch.listen) return [];
+      const parts = [].concat(ch.listen).map((en) => ({ en }));
+      if (ch.sayOptions) {
+        $app.querySelectorAll('.widget .choice').forEach((b) => {
+          const o = ch.options[+b.dataset.i];
+          if (o && o.say) parts.push({ en: o.say, start: () => b.classList.add('saying'), end: () => b.classList.remove('saying') });
+        });
+      }
+      return parts;
+    };
+    const listen = (withPrompt) => S.say([...(withPrompt ? [{ es: ch.prompt }] : []), ...enParts()]);
+    // devices without an English voice: show the words instead
+    const checkVoice = (c) => {
+      const st = S.enStatus(), box = q('.nolisten');
+      if (!box || c !== ch) return;
+      if (st === 'wait') return setTimeout(() => checkVoice(c), 600);
+      box.hidden = st !== 'none';
     };
 
     const ctx = {
@@ -528,7 +541,10 @@
         q('.actions').hidden = true;
         fb.hidden = false;
         waitingNext = true;
-        if (young) speak(`${head.replace(/🔥.*/, '')}. ${ch.sayAfter !== undefined ? ch.sayAfter : ch.explain || ''}`);
+        const after = `${head.replace(/🔥.*/, '')}. ${ch.sayAfter !== undefined ? ch.sayAfter : ch.explain || ''}`;
+        const word = ch.explainListen || (ch.listen && [].concat(ch.listen)[0]);
+        if (word) S.say([...(young ? [{ es: after }] : []), { en: word }]);
+        else if (young) speak(after);
         fb.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
       },
     };
@@ -551,7 +567,8 @@
         dots[i].className = 'now';
         q('.ptitle').textContent = `${ses.title} · ${i + 1} de ${total}`;
       }
-      q('.prompt').innerHTML = ch.prompt;
+      q('.prompt').innerHTML = ch.prompt + (ch.listen ? `<div class="listenbar"><button type="button" class="btn listen">🔊 Escuchar</button>
+        <span class="nolisten" hidden>🔤 <b>${[].concat(ch.listen).map(esc).join(' · ')}</b><small>Tu dispositivo no tiene voz en inglés</small></span></div>` : '');
       q('.feedback').hidden = true;
       q('.bubble').hidden = true;
       q('.actions').hidden = false;
@@ -563,7 +580,7 @@
       widget = S.widgets[ch.type](ch, fresh, ctx);
       q('.check').hidden = !widget.check;
       if (!widget.check && q('.hint').hidden) q('.actions').hidden = true;
-      if (young) speak(ch.prompt);
+      if (ch.listen) { listen(young); checkVoice(ch); } else if (young) speak(ch.prompt);
       window.scrollTo(0, 0);
     }
     function next() {
@@ -636,7 +653,9 @@
       q('.bubble').hidden = false;
       if (young) speak(ch.hint || concepts.map(([t, d]) => `${t}: ${d}`).join('. '));
     });
-    if (young) q('.again').addEventListener('click', () => speak(ch.prompt));
+    if (young) q('.again').addEventListener('click', () => (ch.listen ? listen(true) : speak(ch.prompt)));
+    // replaying the English audio is free: it never counts as an attempt
+    q('.prompt').addEventListener('click', (e) => { if (e.target.closest('.listen')) listen(false); });
     q('.quit').addEventListener('click', () => { if (confirm('¿Salir de la misión? Perderás el progreso de esta partida.')) map(ses.sub); });
     keyHandler = (e) => {
       if (e.metaKey || e.ctrlKey || e.altKey) return;
@@ -677,7 +696,7 @@
         <button class="btn ${nextUp || examUp ? 'ghost' : 'primary'}" data-act="again">🔁 ${ses.exam ? 'Otra vez' : 'Repetir'}</button>
         <button class="btn ghost" data-act="map">🪐 Volver al mapa</button>
       </div>
-    </section>`);
+    </section>`, ses.sub);
     if (r.party) { sfx.win(); fx.confetti(60); }
     if (ses.young) speak(r.head);
     const goNext = () => travel(ses.sub, ses.unit, nextUp.u, () => startMission(ses.sub, nextUp.u, nextUp.m));
@@ -702,7 +721,7 @@
     const subs = all.filter((s) => forAge(s, me) || played(s)).sort((a, b) => score(a) - score(b));
     const nextStep = (s) => {
       const u = s.units.find((x) => x.section !== 'arcade' && unitOpen(s, x) && !unitDone(s, x));
-      if (u) return `Siguiente planeta: <b>${u.emoji} ${u.planet}</b>`;
+      if (u) return `${TH(s).words.next}: <b>${u.emoji} ${u.planet}</b>`;
       const sec = termSecs(s).find((x) => examOpen(s, x) && !passed(x.key));
       if (sec) return `Te toca: <b>📝 ${examOf(s, sec).title}</b>`;
       if (s.final && finalOpen(s) && !passed(s.final.key)) return 'Te toca: <b>🏆 Examen final de curso</b>';
@@ -715,7 +734,7 @@
         const us = unitsOf(s, sec), open = secOpen(s, sec);
         const g = us.reduce((a, u) => a + unitStars(s, u), 0), m = us.reduce((a, u) => a + u.missions.length * 3, 0);
         return `<div class="prow${open ? '' : ' locked'}">
-          <div class="phead"><b>${sec.emoji || '🪐'} ${sec.title || 'Planetas'}</b><span>${!open ? '🔒 Cerrado' : sec.exam === false ? '' : `Examen: ${examText(s, sec.key)}`}</span></div>
+          <div class="phead"><b>${sec.emoji || TH(s).words.icon} ${sec.title || TH(s).words.many.replace(/^./, (c) => c.toUpperCase())}</b><span>${!open ? '🔒 Cerrado' : sec.exam === false ? '' : `Examen: ${examText(s, sec.key)}`}</span></div>
           <span class="tbar"><i style="width:${m ? (g / m) * 100 : 0}%"></i></span>
           <div class="pchips">${us.map((u) => `<span class="pchip${unitOpen(s, u) ? (unitDone(s, u) ? ' done' : '') : ' locked'}" title="${u.planet}">${unitOpen(s, u) ? u.emoji : '🔒'}<i>${unitStars(s, u)}/${u.missions.length * 3}</i></span>`).join('')}</div>
         </div>`;
@@ -741,6 +760,7 @@
   }
 
   fx.starfield();
+  fx.sea();
   S.brandIntro();
   start();
 })();

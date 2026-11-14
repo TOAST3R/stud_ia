@@ -893,3 +893,68 @@ body::before {
 .snake > span.sb { background: #2ed9a3; box-shadow: inset 0 -3px 0 #1a9e76; }
 .snake > span.sh { background: #1a9e76; font-size: calc(min(88vw, 360px) / var(--n) * .42); }
 .snake > span.tok { background: #fff; color: var(--ink); box-shadow: 0 3px 0 #8cc477; }
+
+/* =====================================================================
+   Ocean theme (body[data-theme="ocean"], Inglés): a submarine travels
+   from island to island. Same toys, now underwater.
+   ===================================================================== */
+#sea { position: fixed; inset: 0; pointer-events: none; z-index: 0; overflow: hidden; display: none; }
+body[data-theme="ocean"] #sea { display: block; }
+body[data-theme="ocean"] #stars { display: none; }
+body[data-theme="ocean"] {
+  background:
+    radial-gradient(1100px 700px at 70% -20%, #2fb5d9 0%, transparent 60%),
+    radial-gradient(900px 600px at -15% 105%, #062a5c 0%, transparent 60%),
+    linear-gradient(180deg, #0c5c8f 0%, #08356b 45%, #061c45 100%);
+  background-attachment: fixed;
+}
+body[data-theme="ocean"]::before {
+  background: radial-gradient(40% 35% at 30% 30%, rgba(62, 220, 255, .16), transparent 70%), radial-gradient(35% 30% at 75% 70%, rgba(46, 217, 163, .12), transparent 70%);
+}
+#sea .ray { position: absolute; top: -10%; width: 14vw; height: 90vh; background: linear-gradient(180deg, rgba(190, 245, 255, .16), transparent 80%); transform-origin: top center; animation: ray 9s ease-in-out infinite alternate; filter: blur(6px); }
+@keyframes ray { from { transform: rotate(14deg); opacity: .5; } to { transform: rotate(22deg); opacity: 1; } }
+#sea .bub { position: absolute; bottom: -30px; border-radius: 50%; border: 2px solid rgba(220, 250, 255, .55); background: radial-gradient(circle at 30% 30%, rgba(255, 255, 255, .6), rgba(255, 255, 255, .05) 60%); animation: bubble linear infinite; }
+@keyframes bubble { to { transform: translate(var(--dx, 20px), -115vh); } }
+@media (prefers-reduced-motion: reduce) { #sea .bub, #sea .ray { animation: none; } }
+
+/* islands: a sand island with a coloured hill, a palm and a face */
+body[data-theme="ocean"] .gnode .orb {
+  border-radius: 50% 50% 46% 46%;
+  background:
+    radial-gradient(circle at 32% 30%, rgba(255, 255, 255, .55) 0 6%, transparent 20%),
+    radial-gradient(ellipse 60% 38% at 50% 26%, var(--c) 0 60%, transparent 63%),
+    radial-gradient(ellipse at 50% 60%, #ffe9b0 0 58%, #f2c46d 70%);
+  box-shadow: inset -6px -8px 0 rgba(160, 100, 20, .25), 0 0 0 3px var(--ink), 0 0 0 9px rgba(140, 235, 255, .35), 0 10px 0 9px rgba(4, 30, 70, .35), 0 0 30px color-mix(in srgb, var(--c) 40%, transparent);
+}
+body[data-theme="ocean"] .gnode .face { top: 42%; }
+body[data-theme="ocean"] .gnode .palm { position: absolute; left: -30%; top: -58%; width: 84%; z-index: 2; overflow: visible; filter: drop-shadow(0 3px 0 rgba(4, 30, 70, .35)); transform-origin: 60% 90%; animation: sway 4s ease-in-out infinite; }
+@keyframes sway { 50% { transform: rotate(-5deg); } }
+body[data-theme="ocean"] .gnode.locked .orb { box-shadow: 0 0 0 3px var(--ink), 0 10px 0 rgba(4, 30, 70, .35); }
+body[data-theme="ocean"] .gnode .tag { box-shadow: 0 4px 0 #8fd9f0; }
+body[data-theme="ocean"] .gtrail .trail-glow { stroke: rgba(140, 235, 255, .3); }
+/* the exam: a shipwreck on the sea floor */
+body[data-theme="ocean"] .gnode.boss .orb { border-radius: 50%; background: radial-gradient(circle at 50% 70%, #0a4a7a 0 40%, #04213f 72%); box-shadow: 0 0 0 3px var(--ink), 0 0 0 9px rgba(140, 235, 255, .25), 0 0 40px #2fb5d9; }
+body[data-theme="ocean"] .gnode.boss .wreck { position: absolute; inset: 14% 6% 10%; display: grid; place-items: center; animation: rock 5s ease-in-out infinite; }
+body[data-theme="ocean"] .gnode.boss .ship { width: 100%; overflow: visible; }
+@keyframes rock { 50% { transform: rotate(-6deg) translateY(-2px); } }
+body[data-theme="ocean"] .gnode.boss.locked .wreck { animation: none; }
+body[data-theme="ocean"] .gnode.final .orb { background: radial-gradient(circle at 35% 30%, #fff3b0, #ffd23f 45%, #c08f00); }
+/* a whale crosses the map instead of the UFO */
+.whale { position: fixed; z-index: 0; top: 30%; left: -140px; font-size: 76px; pointer-events: none; animation: whale 32s linear 2s infinite; filter: drop-shadow(0 8px 6px rgba(0, 0, 0, .3)); }
+@keyframes whale { 0% { transform: translate(0, 0) scaleX(-1); } 50% { transform: translate(calc(50vw + 70px), 40px) scaleX(-1); } 100% { transform: translate(calc(100vw + 280px), 0) scaleX(-1); } }
+body[data-theme="ocean"] .term { background: rgba(4, 34, 80, .5); border-color: #1f7fb0; }
+body[data-theme="ocean"] .termhead .fold, body[data-theme="ocean"] .btn.ghost, body[data-theme="ocean"] .icon, body[data-theme="ocean"] .pill { background: #155a92; }
+body[data-theme="ocean"] .overlay .sheet { background: #0b3d6e; }
+body[data-theme="ocean"] .boss-tag { background: #062a52 !important; }
+body[data-theme="ocean"] .boss-tag small { color: #8fd9f0 !important; }
+
+/* English audio (Inglés): the listen button, and the words when there is no English voice */
+.listenbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 10px; margin-top: 12px; }
+.btn.listen { background: var(--sky); color: var(--ink); font-size: 22px; padding: 14px 28px; border-radius: 999px; box-shadow: 0 5px 0 #1a7fb0; }
+.play.young .btn.listen { font-size: 28px; padding: 18px 36px; }
+.nolisten { display: inline-flex; flex-direction: column; align-items: center; padding: 8px 16px; border-radius: 16px; background: #fff4c2; color: var(--ink); }
+.nolisten[hidden] { display: none; }
+.nolisten b { font-size: 24px; }
+.nolisten small { color: #7a6aa8; font-size: 12px; }
+.choice.saying { transform: scale(1.08); border-color: var(--sky); box-shadow: 0 0 0 4px var(--sky), 0 6px 0 var(--line); }
+.word-en { font-family: var(--display); font-weight: 400; letter-spacing: .02em; }

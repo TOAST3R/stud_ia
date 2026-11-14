@@ -62,3 +62,25 @@ La firma de la marca es el **guion bajo**:
 - Celebra el esfuerzo sin exagerar: "¡Conseguido!", "¡Casi! Prueba otra vez."
 - Los errores dicen qué hacer, sin culpas: "🔒 Primero completa Cascada Cero."
 - Pocos emojis y siempre con significado: 🔒 cerrado, ⭐ estrellas, 💎 cristales, 📝 examen.
+
+## Tema océano (Inglés)
+
+Inglés no ocurre en el espacio: **un submarino viaja de isla en isla**. Mismos juguetes de plástico brillante, ahora bajo el agua.
+
+| Espacio (por defecto) | Océano (Inglés) |
+|---|---|
+| Galaxia | Océano |
+| Nivel o trimestre | Mar: *Shallow Sea*, *Coral Sea*, *Deep Blue*, *The Abyss* |
+| Planeta con cara | Isla de arena con palmera, colina del color del tema y la misma cara |
+| Agujero negro (examen) | Barco hundido que se balancea en el fondo |
+| Ovni cruzando el mapa | Ballena 🐳 cruzando el mapa |
+| Estrellas y nebulosa | Rayos de luz y burbujas subiendo, fondo azul profundo |
+| Cohete que salta meteoritos | Submarino amarillo con el personaje en el ojo de buey: sube al tocar, baja solo, esquiva medusas y minas y recoge perlas |
+
+- **Color:** azules del mar (`#0C5C8F` → `#061C45`) y arena (`#FFE9B0`). El limón, el chicle y la tinta de la marca se mantienen para botones, estrellas y contornos.
+- **Palabras:** "isla/islas" en lugar de "planeta/planetas" en avisos, examen y progreso. Los nombres de mares e islas van en inglés ("Colour Island"); las instrucciones siguen en español.
+- **Voz:** las palabras en inglés suenan con voz británica (o la inglesa que haya), un poco más despacio, y suenan aunque el sonido esté apagado: son la lección. Nunca se usa el micrófono.
+
+### Cómo se añade otro tema
+
+Los temas viven en `S.themes` (`js/core.js`). Una asignatura elige el suyo con `theme: 'ocean'`; sin `theme` usa `space`. Cada tema define cómo se dibujan las islas o planetas (`node`), el examen (`boss`), el examen por defecto, las palabras (`words`), la decoración del mapa (`deco`), el modo del minijuego (`runner`: `jump` o `swim`) y el fondo (`backdrop`). Los estilos propios van en `css/style.css` bajo `body[data-theme="…"]`.
