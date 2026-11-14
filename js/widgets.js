@@ -375,7 +375,8 @@
   W.order = function (ch, el, ctx) {
     const n = ch.items.length, seq = [];
     const sorted = ch.items.map((x, i) => i).sort((a, b) => ch.items[a].rank - ch.items[b].rank);
-    const rightAt = (k) => ch.items[seq[k]].rank === ch.items[sorted[k]].rank;
+    // ch.byLabel: items with the same label are interchangeable (the two "t" of "toilet")
+    const rightAt = (k) => ch.items[seq[k]].rank === ch.items[sorted[k]].rank || (ch.byLabel && ch.items[seq[k]].label === ch.items[sorted[k]].label);
     let attempts = 0, mistakes = 0, over = false, state = '';
 
     function paint() {
@@ -490,6 +491,7 @@
 
   // ---------------------------------------------------------------
   // memory: find the pairs. ch.pairs [[a, b]] (a and b can differ, e.g. 3 and •••)
+  //   ch.says [English word per pair] spoken when a card turns (Inglés)
   // ---------------------------------------------------------------
   W.memory = function (ch, el, ctx) {
     const cards = S.R.shuffle(ch.pairs.flatMap((p, i) => [{ i, h: p[0] }, { i, h: p[1] }]));
@@ -503,6 +505,7 @@
       if (!b || busy || b.classList.contains('up')) return;
       b.classList.add('up');
       sfx.tap();
+      if (ch.says) S.speakEn(ch.says[cards[+b.dataset.k].i]); // Inglés: each card says its word
       open.push(+b.dataset.k);
       if (open.length < 2) return;
       const [a, c] = open;
